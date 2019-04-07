@@ -51,7 +51,7 @@ CHIP CPU {
 	Or(a=seladdr, b=ins5, out=loadregiA);
 
 	// A register
-	Register(in=forAregi, load=loadregiA, out=Aout, out[0..14]=addressM);
+	ARegister(in=forAregi, load=loadregiA, out=Aout, out[0..14]=addressM);
 
 	// Select A or M as input
 	Mux16(a=Aout, b=inM, sel=ins12, out=outAorM);
