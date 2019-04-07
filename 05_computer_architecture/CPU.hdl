@@ -40,4 +40,47 @@ CHIP CPU {
 
     PARTS:
     // Put your code here:
+	// Instruction decoding, if instruction[15]=0, then control bit all set to 0
+	Mux16(a=false, b=instruction, sel=instruction[15], out[3]=writeM, out[0]=ins0, out[1]=ins1, out[2]=ins2, out[3]=ins3, out[4]=ins4, out[5]=ins5, out[6]=ins6, out[7]=ins7, out[8]=ins8, out[9]=ins9, out[10]=ins10, out[11]=ins11, out[12]=ins12);
+
+	// Mux16 select from input address or ALU output for A Register
+	Not(in=instruction[15], out=seladdr);
+	Mux16(a=ALUout, b=instruction, sel=seladdr, out=forAregi);
+
+	// if instruction[15] is zero or ins5 is true, load input to A register
+	Or(a=seladdr, b=ins5, out=loadregiA);
+
+	// A register
+	Register(in=forAregi, load=loadregiA, out=Aout, out[0..14]=addressM);
+
+	// Select A or M as input
+	Mux16(a=Aout, b=inM, sel=ins12, out=outAorM);
+	
+	// D register
+	DRegister(in=ALUout, load=ins4, out=Dout);
+
+	// ALU
+	ALU(x=Dout, y=outAorM, zx=ins11, nx=ins10, zy=ins9, ny=ins8, f=ins7, no=ins6, out=outM, out=ALUout, zr=zr, ng=ng);
+
+	// ins jump bits for load of PC
+	// jump negative
+	Xor(a=ins2, b=false, out=negjumpxor);
+	Xor(a=ng, b=false, out=ngxor);
+	And(a=negjumpxor, b=ngxor, out=jumpneg);
+	// jump zero
+	Xor(a=ins1, b=false, out=zerojumpxor);
+	Xor(a=zr, b=false, out=zrxor);
+	And(a=zerojumpxor, b=zrxor, out=jumpzero);
+	// jump positive
+	Xor(a=ins0, b=false, out=posjumpxor);
+	Or(a=zr, b=ng, out=zrorng);
+	Xor(a=zrorng, b=true, out=zrorngxor);
+	And(a=posjumpxor, b=zrorngxor, out=jumppos);
+
+	// Jump negative or zero or positive
+	Or(a=jumpneg, b=jumpzero, out=jumpnegorzero);
+	Or(a=jumpnegorzero, b=jumppos, out=jump);
+
+	// PC
+	PC(in=Aout, load=jump, inc=true, reset=reset, out[0..14]=pc);
 }
