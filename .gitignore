@@ -1,2 +1,4 @@
 downloads/
 *.dat
+__pycache__/
+*.swp
