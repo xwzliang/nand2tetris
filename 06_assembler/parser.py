@@ -1,10 +1,12 @@
+from code_to_bin import Code2Bin
 
 class Parser():
     """Parser: Encapsulates access to the input code. Reads an assembly language command, parses it, and provides convenient access to the command's components (fields and symbols). In addition, removes all white space and comments."""
 
     def __init__(self, in_file):
-        """Get the input file and gets ready to parse it."""
+        """Get the input file and gets ready to parse it. Instantiate a Code2bin for binary translation"""
         self.in_file = in_file
+        self.code2bin = Code2Bin()
 
     def process(self, line):
         """Removes all white space and comments"""
@@ -44,18 +46,33 @@ class Parser():
             jump = command.split('=')[1].split(';')[1]
         return dest, comp, jump
 
+    def translate(self, command):
+        """Given a command, return binary translation"""
+        cmd_type = self.command_type(command)
+        if cmd_type == 'A_COMMAND' or cmd_type == 'L_COMMAND':
+            symbol = self.get_symbol(command)
+            if symbol.isdigit():
+                return '0{:015b}'.format(int(symbol))
+        else:
+            dest, comp, jump = self.get_dest_comp_jump(command)
+            dest_binary = self.code2bin.dest2bin(dest)
+            comp_binary = self.code2bin.comp2bin(comp)
+            jump_binary = self.code2bin.jump2bin(jump)
+            return '111' + comp_binary + dest_binary + jump_binary
+
+    def write_out_binarys(self):
+        with open(self.in_file.replace('asm', 'hack'), 'w', encoding='utf_8') as outf:
+            for binary in self.out_binarys:
+                outf.write(binary + '\n')
+
     def parse(self):
+        self.out_binarys = []
         with open(self.in_file, 'r', encoding='utf_8') as inf:
             for line in inf:
                 command = self.process(line)
                 # If returned command is an empty line after processed, skip it
                 if not command:
                     continue
-                cmd_type = self.command_type(command)
-                if cmd_type == 'A_COMMAND' or cmd_type == 'L_COMMAND':
-                    symbol = self.get_symbol(command)
-                    print(symbol)
-                else:
-                    dest, comp, jump = self.get_dest_comp_jump(command)
-                    print(dest, comp, jump)
+                self.out_binarys.append(self.translate(command))
+        self.write_out_binarys()
 
