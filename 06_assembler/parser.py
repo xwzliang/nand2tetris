@@ -1,4 +1,5 @@
 from code_to_bin import Code2Bin
+from symbol_table import SymbolTable
 
 class Parser():
     """Parser: Encapsulates access to the input code. Reads an assembly language command, parses it, and provides convenient access to the command's components (fields and symbols). In addition, removes all white space and comments."""
@@ -7,10 +8,12 @@ class Parser():
         """Get the input file and gets ready to parse it. Instantiate a Code2bin for binary translation"""
         self.in_file = in_file
         self.code2bin = Code2Bin()
+        self.symb_table = SymbolTable()
 
     def read_in_file(self):
         """Read the input file and process lines, put lines containing codes to a buffer"""
         self.code_contents = []
+        ROM_address = 0
         with open(self.in_file, 'r', encoding='utf_8') as inf:
             for line in inf:
                 command = self.process(line)
@@ -18,6 +21,12 @@ class Parser():
                 if not command:
                     continue
                 self.code_contents.append(command)
+                cmd_type = self.command_type(command)
+                if cmd_type == 'L_COMMAND':	# cmd_type is 'L_COMMAND', add new entry to the symbol table
+                    symbol = self.get_symbol(command)
+                    self.symb_table.add_entry(symbol, ROM_address)
+                else:
+                    ROM_address += 1
 
     def process(self, line):
         """Removes all white space and comments"""
@@ -57,19 +66,32 @@ class Parser():
             jump = command.split('=')[1].split(';')[1]
         return dest, comp, jump
 
-    def translate(self, command):
-        """Given a command, return binary translation"""
-        cmd_type = self.command_type(command)
-        if cmd_type == 'A_COMMAND' or cmd_type == 'L_COMMAND':
-            symbol = self.get_symbol(command)
-            if symbol.isdigit():
-                return '0{:015b}'.format(int(symbol))
-        else:
-            dest, comp, jump = self.get_dest_comp_jump(command)
-            dest_binary = self.code2bin.dest2bin(dest)
-            comp_binary = self.code2bin.comp2bin(comp)
-            jump_binary = self.code2bin.jump2bin(jump)
-            return '111' + comp_binary + dest_binary + jump_binary
+    def translate(self):
+        """Second pass, translate code_contents to binary contens"""
+        self.out_binarys = []
+        available_RAM_address = 16
+        for command in self.code_contents:
+            cmd_type = self.command_type(command)
+            if cmd_type == 'A_COMMAND':
+                symbol = self.get_symbol(command)
+                if symbol.isdigit():
+                    binary_line =  '0{:015b}'.format(int(symbol))
+                    self.out_binarys.append(binary_line)
+                elif self.symb_table.contains(symbol):
+                    binary_line =  '0{:015b}'.format(int(self.symb_table.get_address(symbol)))
+                    self.out_binarys.append(binary_line)
+                else:
+                    self.symb_table.add_entry(symbol, available_RAM_address)
+                    binary_line =  '0{:015b}'.format(available_RAM_address)
+                    self.out_binarys.append(binary_line)
+                    available_RAM_address += 1
+            elif cmd_type == 'C_COMMAND':
+                dest, comp, jump = self.get_dest_comp_jump(command)
+                dest_binary = self.code2bin.dest2bin(dest)
+                comp_binary = self.code2bin.comp2bin(comp)
+                jump_binary = self.code2bin.jump2bin(jump)
+                binary_line =  '111' + comp_binary + dest_binary + jump_binary
+                self.out_binarys.append(binary_line)
 
     def write_out_binarys(self):
         out_file = self.in_file.replace('asm', 'hack')
@@ -79,9 +101,7 @@ class Parser():
         print(out_file, 'finished assembling.')
 
     def parse(self):
-        self.out_binarys = []
         self.read_in_file()
-        for command in self.code_contents:
-            self.out_binarys.append(self.translate(command))
+        self.translate()
         self.write_out_binarys()
 
