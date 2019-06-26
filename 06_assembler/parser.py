@@ -8,6 +8,17 @@ class Parser():
         self.in_file = in_file
         self.code2bin = Code2Bin()
 
+    def read_in_file(self):
+        """Read the input file and process lines, put lines containing codes to a buffer"""
+        self.code_contents = []
+        with open(self.in_file, 'r', encoding='utf_8') as inf:
+            for line in inf:
+                command = self.process(line)
+                # If returned command is an empty line after processed, skip it
+                if not command:
+                    continue
+                self.code_contents.append(command)
+
     def process(self, line):
         """Removes all white space and comments"""
         return line.split('//')[0].strip()
@@ -61,18 +72,16 @@ class Parser():
             return '111' + comp_binary + dest_binary + jump_binary
 
     def write_out_binarys(self):
-        with open(self.in_file.replace('asm', 'hack'), 'w', encoding='utf_8') as outf:
+        out_file = self.in_file.replace('asm', 'hack')
+        with open(out_file, 'w', encoding='utf_8') as outf:
             for binary in self.out_binarys:
                 outf.write(binary + '\n')
+        print(out_file, 'finished assembling.')
 
     def parse(self):
         self.out_binarys = []
-        with open(self.in_file, 'r', encoding='utf_8') as inf:
-            for line in inf:
-                command = self.process(line)
-                # If returned command is an empty line after processed, skip it
-                if not command:
-                    continue
-                self.out_binarys.append(self.translate(command))
+        self.read_in_file()
+        for command in self.code_contents:
+            self.out_binarys.append(self.translate(command))
         self.write_out_binarys()
 
