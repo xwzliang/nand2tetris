@@ -53,17 +53,15 @@ class Parser():
     def get_dest_comp_jump(self, command):
         """Returns the dest, comp, jump mnemonic in the current C-command. Should be called only when command_type()is C_COMMAND"""
         if ';' not in command:
-            dest = command.split('=')[0]
-            comp = command.split('=')[1]
+            dest, comp = command.split('=')
             jump = 'null'
         elif '=' not in command:
             dest = 'null'
-            comp = command.split(';')[0]
-            jump = command.split(';')[1]
+            comp, jump = command.split(';')
         else:
             dest = command.split('=')[0]
-            comp = command.split('=')[1].split(';')[0]
-            jump = command.split('=')[1].split(';')[1]
+            comp, jump = command.split('=')[1].split(';')
+            # jump = command.split('=')[1].split(';')[1]
         return dest, comp, jump
 
     def translate(self):

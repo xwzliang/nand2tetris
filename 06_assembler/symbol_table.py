@@ -10,7 +10,7 @@ class SymbolTable():
     def add_predefined_symbols(self):
         """Initialize the symbol table with all the predefined symbols and their pre-allocated RAM addresses"""
         cwd = path.dirname(path.realpath(__file__))
-        predefined_symbol_file = path.join(cwd, 'predefined.symbols')
+        predefined_symbol_file = path.join(cwd, 'data', 'predefined.symbols')
         with open(predefined_symbol_file, 'r', encoding='utf_8') as inf:
             for line in inf:
                 symbol, RAM_address = line.strip().split('\t')

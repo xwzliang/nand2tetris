@@ -11,7 +11,7 @@ class Code2Bin():
     def build_bin_dict(self, data_file):
         """Read the contents of the data_file into bin_dict"""
         bin_dict = {}
-        with open(path.join(path.dirname(path.realpath(__file__)), 'code2bin', data_file), 'r', encoding='utf_8') as dataf:
+        with open(path.join(path.dirname(path.realpath(__file__)), 'data', 'code2bin', data_file), 'r', encoding='utf_8') as dataf:
             for line in dataf:
                 command = line.strip().split('\t')[0]
                 binary = line.strip().split('\t')[1]
