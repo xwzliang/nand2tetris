@@ -53,5 +53,6 @@ class Parser:
                 cmd_type = self.get_command_type(command)
                 arguments = self.get_arguments(command, cmd_type)
                 returned_content = [cmd_type, arguments] if arguments else [cmd_type]
+                returned_content.append(command)	# return command itself for notes in output
                 returned_contents.append(returned_content)
         return returned_contents
