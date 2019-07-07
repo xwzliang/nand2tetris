@@ -26,5 +26,9 @@ class VMtranslator(unittest.TestCase):
         vm_file = self.cwd / 'test/StackArithmetic/SimpleAdd/SimpleAdd.vm'
         self.run_test(vm_file)
 
+    def test_stack_arithmetic_stack_test(self):
+        vm_file = self.cwd / 'test/StackArithmetic/StackTest/StackTest.vm'
+        self.run_test(vm_file)
+
 if __name__ == '__main__':
     unittest.main()
