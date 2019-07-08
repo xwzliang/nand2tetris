@@ -30,5 +30,17 @@ class VMtranslator(unittest.TestCase):
         vm_file = self.cwd / 'test/StackArithmetic/StackTest/StackTest.vm'
         self.run_test(vm_file)
 
+    def test_memory_access_basic_test(self):
+        vm_file = self.cwd / 'test/MemoryAccess/BasicTest/BasicTest.vm'
+        self.run_test(vm_file)
+
+    def test_memory_access_pointer_test(self):
+        vm_file = self.cwd / 'test/MemoryAccess/PointerTest/PointerTest.vm'
+        self.run_test(vm_file)
+
+    def test_memory_access_static_test(self):
+        vm_file = self.cwd / 'test/MemoryAccess/StaticTest/StaticTest.vm'
+        self.run_test(vm_file)
+
 if __name__ == '__main__':
     unittest.main()
