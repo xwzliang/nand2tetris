@@ -55,4 +55,4 @@ class Parser:
                 returned_content = [cmd_type, arguments] if arguments else [cmd_type]
                 returned_content.append(command)	# return command itself for notes in output
                 returned_contents.append(returned_content)
-        return returned_contents
+        return {self.in_file.stem: returned_contents}	# Return filename as key and code_contents as value, filename will be further used in static memory segment translation
