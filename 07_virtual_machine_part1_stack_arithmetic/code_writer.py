@@ -10,7 +10,7 @@ class CodeWriter:
         self.fixed_memory_base_dict = {'pointer': '3',
                 		       'temp': '5'}
 
-    def translate_arithmetic(self, operator, command_index):
+    def translate_arithmetic(self, filename, operator, command_index):
         """Generate the assembly code that is the translation of the given arithmetic command."""
         assembly_codes = []
         if operator == 'add':
@@ -42,18 +42,18 @@ class CodeWriter:
                               'D=M',	# D=Y
                               'A=A-1',
                               'D=M-D',	# D=X-Y
-                              '@IS_EQUAL_{}'.format(command_index), 
+                              '@IS_EQUAL_{}_{}'.format(filename, command_index), 
                               'D;JEQ',	# if D=0 jump to label IS_EQUAL
                               '@SP',
                               'A=M-1',
                               'M=0',	# if D!=0, M=False
-                              '@END_COMPARE_EQ_{}'.format(command_index),
+                              '@END_COMPARE_EQ_{}_{}'.format(filename, command_index),
                               '0;JMP',	# jump to label END_COMPARE
-                              '(IS_EQUAL_{})'.format(command_index),	# define label IS_EQUAL
+                              '(IS_EQUAL_{}_{})'.format(filename, command_index),	# define label IS_EQUAL
                               '@SP',
                               'A=M-1',
                               'M=-1',	# D=0 so M=True(-1)
-                              '(END_COMPARE_EQ_{})'.format(command_index)	# define label END_COMPARE
+                              '(END_COMPARE_EQ_{}_{})'.format(filename, command_index)	# define label END_COMPARE
                               ]
         elif operator == 'gt':
             assembly_codes = [
@@ -62,18 +62,18 @@ class CodeWriter:
                               'D=M',	# D=Y
                               'A=A-1',
                               'D=M-D',	# D=X-Y
-                              '@IS_GREATER_{}'.format(command_index), 
+                              '@IS_GREATER_{}_{}'.format(filename, command_index), 
                               'D;JGT',	# if D>0 jump to label IS_GREATER
                               '@SP',
                               'A=M-1',
                               'M=0',	# D<=0, M=False
-                              '@END_COMPARE_GT_{}'.format(command_index),
+                              '@END_COMPARE_GT_{}_{}'.format(filename, command_index),
                               '0;JMP',	# jump to label END_COMPARE
-                              '(IS_GREATER_{})'.format(command_index),	# define label IS_GREATER
+                              '(IS_GREATER_{}_{})'.format(filename, command_index),	# define label IS_GREATER
                               '@SP',
                               'A=M-1',
                               'M=-1',	# D>0 so M=True(-1)
-                              '(END_COMPARE_GT_{})'.format(command_index)	# define label END_COMPARE
+                              '(END_COMPARE_GT_{}_{})'.format(filename, command_index)	# define label END_COMPARE
                               ]
         elif operator == 'lt':
             assembly_codes = [
@@ -82,18 +82,18 @@ class CodeWriter:
                               'D=M',	# D=Y
                               'A=A-1',
                               'D=M-D',	# D=X-Y
-                              '@IS_LESS_{}'.format(command_index), 
+                              '@IS_LESS_{}_{}'.format(filename, command_index), 
                               'D;JLT',	# if D<0 jump to label IS_LESS
                               '@SP',
                               'A=M-1',
                               'M=0',	# D>=0, M=False
-                              '@END_COMPARE_LT_{}'.format(command_index),
+                              '@END_COMPARE_LT_{}_{}'.format(filename, command_index),
                               '0;JMP',	# jump to label END_COMPARE
-                              '(IS_LESS_{})'.format(command_index),	# define label IS_LESS
+                              '(IS_LESS_{}_{})'.format(filename, command_index),	# define label IS_LESS
                               '@SP',
                               'A=M-1',
                               'M=-1',	# D<0 so M=True(-1)
-                              '(END_COMPARE_LT_{})'.format(command_index)	# define label END_COMPARE
+                              '(END_COMPARE_LT_{}_{})'.format(filename, command_index)	# define label END_COMPARE
                               ]
         elif operator == 'and':
             assembly_codes = [
@@ -231,8 +231,8 @@ class CodeWriter:
                 assembly_codes = []
                 if cmd_type == 'C_ARITHMETIC':
                     operator = command_content[1]
-                    # Pass command_index to translate_arithmetic method for generating unique labels at runtime
-                    assembly_codes = self.translate_arithmetic(operator, command_index)
+                    # Pass filename and command_index to translate_arithmetic method for generating unique labels at runtime
+                    assembly_codes = self.translate_arithmetic(filename, operator, command_index)
                 elif cmd_type == 'C_PUSH' or cmd_type == 'C_POP':
                     memory_segment, memory_index = command_content[1]
                     assembly_codes = self.translate_push_pop(filename, cmd_type, memory_segment, memory_index)
