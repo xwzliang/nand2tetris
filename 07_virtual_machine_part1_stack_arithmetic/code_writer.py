@@ -3,120 +3,82 @@ class CodeWriter:
     def __init__(self, code_contents, out_file):
         self.out_file = out_file
         self.code_contents = code_contents
+        self.setup_for_asm_code_translation()
+
+    def setup_for_asm_code_translation(self):
+        """Initialize common stuff which will be used in asm code translation"""
         self.dynamic_memory_base_dict = {'argument': 'ARG',
                                          'local': 'LCL',
                                          'this': 'THIS',
                                          'that': 'THAT'}
         self.fixed_memory_base_dict = {'pointer': '3',
                 		       'temp': '5'}
+        self.asm_code_operator_dict = {
+                'add': 'M=D+M',	# M=Y+X'
+                'sub': 'M=M-D',	# M=X-Y'
+                'and': 'M=D&M',	# M=Y&X'
+                'or': 'M=D|M',	# M=Y|X'
+                'neg': 'M=-M',	# Y=-Y
+                'not': 'M=!M',	# Y=!Y
+                }              
+        self.asm_code_arithmetic_make_DeqY_MeqX_SPminus1 = [
+                              '@SP', 
+                    	      'AM=M-1',	# SP--, A=M-1
+                              'D=M',	# D=Y
+                              'A=A-1',
+                ]
+        self.asm_code_memory_push_content_in_D = [
+                              '@SP',
+                              'A=M',
+                              'M=D',	# *SP=constant i
+                              '@SP',
+                              'M=M+1',	# SP++
+                ]
+        self.asm_code_memory_pop_address_in_D = [
+                              '@SP',
+                              'A=M',	# Get to the place which SP points to
+                              'M=D',	# Dump address stored in D to M
+                              'A=A-1',
+                              'D=M',	# D=*SP
+                              'A=A+1',	# Get to the place where address is stored
+                              'A=M',	# Get to the place where address points to
+                              'M=D',	# Write value stored in D to M
+                              '@SP',
+                              'M=M-1',	# SP--
+                ]
 
     def translate_arithmetic(self, filename, operator, command_index):
         """Generate the assembly code that is the translation of the given arithmetic command."""
         assembly_codes = []
-        if operator == 'add':
+        if operator in ['add', 'sub', 'and', 'or']:
             assembly_codes = [
-                    	      '@SP', 
-                    	      'AM=M-1',	# SP--, A=M-1
-                              'D=M',	# D=Y
-                              'A=A-1',
-                              'M=D+M',	# X=Y+X
-                              ]
-        elif operator == 'sub':
+                    *self.asm_code_arithmetic_make_DeqY_MeqX_SPminus1,
+                    self.asm_code_operator_dict[operator],
+                ]
+        elif operator in ['neg', 'not']:
             assembly_codes = [
-                              '@SP', 
-                    	      'AM=M-1',	# SP--, A=M-1
-                              'D=M',	# D=Y
-                              'A=A-1',
-                              'M=M-D',	# X=X-Y
-                              ]
-        elif operator == 'neg':
+                    '@SP', 
+                    'A=M-1',
+                    self.asm_code_operator_dict[operator],
+                ]
+        else:	# operator is 'eq' or 'gt' or 'lt':
+            op_upper = operator.upper()
             assembly_codes = [
-                              '@SP', 
-                              'A=M-1',
-                              'M=-M',	# Y=-Y
-                              ]
-        elif operator == 'eq':
-            assembly_codes = [
-                              '@SP', 
-                    	      'AM=M-1',	# SP--, A=M-1
-                              'D=M',	# D=Y
-                              'A=A-1',
-                              'D=M-D',	# D=X-Y
-                              '@IS_EQUAL_{}_{}'.format(filename, command_index), 
-                              'D;JEQ',	# if D=0 jump to label IS_EQUAL
-                              '@SP',
-                              'A=M-1',
-                              'M=0',	# if D!=0, M=False
-                              '@END_COMPARE_EQ_{}_{}'.format(filename, command_index),
-                              '0;JMP',	# jump to label END_COMPARE
-                              '(IS_EQUAL_{}_{})'.format(filename, command_index),	# define label IS_EQUAL
-                              '@SP',
-                              'A=M-1',
-                              'M=-1',	# D=0 so M=True(-1)
-                              '(END_COMPARE_EQ_{}_{})'.format(filename, command_index)	# define label END_COMPARE
-                              ]
-        elif operator == 'gt':
-            assembly_codes = [
-                              '@SP', 
-                    	      'AM=M-1',	# SP--, A=M-1
-                              'D=M',	# D=Y
-                              'A=A-1',
-                              'D=M-D',	# D=X-Y
-                              '@IS_GREATER_{}_{}'.format(filename, command_index), 
-                              'D;JGT',	# if D>0 jump to label IS_GREATER
-                              '@SP',
-                              'A=M-1',
-                              'M=0',	# D<=0, M=False
-                              '@END_COMPARE_GT_{}_{}'.format(filename, command_index),
-                              '0;JMP',	# jump to label END_COMPARE
-                              '(IS_GREATER_{}_{})'.format(filename, command_index),	# define label IS_GREATER
-                              '@SP',
-                              'A=M-1',
-                              'M=-1',	# D>0 so M=True(-1)
-                              '(END_COMPARE_GT_{}_{})'.format(filename, command_index)	# define label END_COMPARE
-                              ]
-        elif operator == 'lt':
-            assembly_codes = [
-                              '@SP', 
-                    	      'AM=M-1',	# SP--, A=M-1
-                              'D=M',	# D=Y
-                              'A=A-1',
-                              'D=M-D',	# D=X-Y
-                              '@IS_LESS_{}_{}'.format(filename, command_index), 
-                              'D;JLT',	# if D<0 jump to label IS_LESS
-                              '@SP',
-                              'A=M-1',
-                              'M=0',	# D>=0, M=False
-                              '@END_COMPARE_LT_{}_{}'.format(filename, command_index),
-                              '0;JMP',	# jump to label END_COMPARE
-                              '(IS_LESS_{}_{})'.format(filename, command_index),	# define label IS_LESS
-                              '@SP',
-                              'A=M-1',
-                              'M=-1',	# D<0 so M=True(-1)
-                              '(END_COMPARE_LT_{}_{})'.format(filename, command_index)	# define label END_COMPARE
-                              ]
-        elif operator == 'and':
-            assembly_codes = [
-                              '@SP', 
-                    	      'AM=M-1',	# SP--, A=M-1
-                              'D=M',	# D=Y
-                              'A=A-1',
-                              'M=D&M',	# M=Y&X
-                              ]
-        elif operator == 'or':
-            assembly_codes = [
-                              '@SP', 
-                    	      'AM=M-1',	# SP--, A=M-1
-                              'D=M',	# D=Y
-                              'A=A-1',
-                              'M=D|M',	# M=Y|X
-                              ]
-        elif operator == 'not':
-            assembly_codes = [
-                              '@SP', 
-                              'A=M-1',
-                              'M=!M',	# Y=!Y
-                              ]
+                    *self.asm_code_arithmetic_make_DeqY_MeqX_SPminus1,
+                    'D=M-D',	# D=X-Y
+                    '@IS_{}_{}_{}'.format(op_upper, filename, command_index), 
+                    'D;J{}'.format(op_upper),	# if D compares to 0 using specified operator succeeds, jump to label specified above
+                    '@SP',
+                    'A=M-1',
+                    'M=0',	# if D compares to 0 using specified operator fails, M=False
+                    '@END_COMPARE_{}_{}_{}'.format(op_upper, filename, command_index),
+                    '0;JMP',	# jump to label END_COMPARE
+                    '(IS_{}_{}_{})'.format(op_upper, filename, command_index),	# define label for successful coparision using specified operator
+                    '@SP',
+                    'A=M-1',
+                    'M=-1',	# D compares to 0 succeeds, so M=True(-1)
+                    '(END_COMPARE_{}_{}_{})'.format(op_upper, filename, command_index)	# define label END_COMPARE
+                ]
         return assembly_codes
 
     def translate_push_pop(self, filename, cmd_type, memory_segment, memory_index):
@@ -127,21 +89,13 @@ class CodeWriter:
                 assembly_codes = [
                         	  '@{}'.format(memory_index),	# A=constant i
                                   'D=A',	# D=constant i
-                                  '@SP',
-                                  'A=M',
-                                  'M=D',	# *SP=constant i
-                                  '@SP',
-                                  'M=M+1',	# SP++
+                                  *self.asm_code_memory_push_content_in_D,
                         ]
             elif memory_segment == 'static':
                 assembly_codes = [
                                   '@{}.{}'.format(filename, memory_index),	# Trick: static j should be translated to @filename.j
                                   'D=M',	# Get the content to D
-                                  '@SP',
-                                  'A=M',
-                                  'M=D',	# *SP=D
-                                  '@SP',
-                                  'M=M+1',	# SP++
+                                  *self.asm_code_memory_push_content_in_D,
                                  ]
             elif memory_segment == 'pointer' or memory_segment == 'temp':
                 assembly_codes = [
@@ -150,11 +104,7 @@ class CodeWriter:
                                   '@{}'.format(self.fixed_memory_base_dict[memory_segment]),	# Get the memory base for memory_segment
                                   'A=D+A',	# Get the address: memory index + momory base (stored as fixed number, so use A)
                                   'D=M',	# Get the content to D
-                                  '@SP',
-                                  'A=M',
-                                  'M=D',	# *SP=D
-                                  '@SP',
-                                  'M=M+1',	# SP++
+                                  *self.asm_code_memory_push_content_in_D,
                                  ]
             else:	# memory_segment in ['argument', 'local', 'this', 'that']
                 assembly_codes = [
@@ -163,27 +113,14 @@ class CodeWriter:
                                   '@{}'.format(self.dynamic_memory_base_dict[memory_segment]),	# Get the memory base for memory_segment
                                   'A=D+M',	# Get the address: memory index + momory base (stored in register pointers, so use M)
                                   'D=M',	# Get the content to D
-                                  '@SP',
-                                  'A=M',
-                                  'M=D',	# *SP=D
-                                  '@SP',
-                                  'M=M+1',	# SP++
+                                  *self.asm_code_memory_push_content_in_D,
                                  ]
         else:	# cmd_type == 'C_POP'
             if memory_segment == 'static':
                 assembly_codes = [
                                   '@{}.{}'.format(filename, memory_index),	# Trick: static j should be translated to @filename.j
                                   'D=A',	# Put the address to D
-                                  '@SP',
-                                  'A=M',	# Get to the place which SP points to
-                                  'M=D',	# Dump address stored in D to M
-                                  'A=A-1',
-                                  'D=M',	# D=*SP
-                                  'A=A+1',	# Get to the place where address is stored
-                                  'A=M',	# Get to the place where address points to
-                                  'M=D',	# Write value stored in D to M
-                                  '@SP',
-                                  'M=M-1',	# SP--
+                                  *self.asm_code_memory_pop_address_in_D,
                                  ]
             elif memory_segment == 'pointer' or memory_segment == 'temp':
                 assembly_codes = [
@@ -191,16 +128,7 @@ class CodeWriter:
                                   'D=A',	# D=memory_index
                                   '@{}'.format(self.fixed_memory_base_dict[memory_segment]),	# Get the memory base for memory_segment
                                   'D=D+A',	# Get the address: memory index + momory base, and stored in D
-                                  '@SP',
-                                  'A=M',	# Get to the address which SP points to
-                                  'M=D',	# Dump address stored in D to M
-                                  'A=A-1',
-                                  'D=M',	# D=*SP
-                                  'A=A+1',	# Get to the place where address is stored
-                                  'A=M',	# Get to the place where address points to
-                                  'M=D',	# Write value stored in D to M
-                                  '@SP',
-                                  'M=M-1',	# SP--
+                                  *self.asm_code_memory_pop_address_in_D,
                                  ]
             else:	# memory_segment in ['argument', 'local', 'this', 'that']
                 assembly_codes = [
@@ -208,21 +136,12 @@ class CodeWriter:
                                   'D=A',	# D=memory_index
                                   '@{}'.format(self.dynamic_memory_base_dict[memory_segment]),	# Get the memory base for memory_segment
                                   'D=D+M',	# Get the address: memory index + momory base, and stored in D
-                                  '@SP',
-                                  'A=M',	# Get to the address which SP points to
-                                  'M=D',	# Dump address stored in D to M
-                                  'A=A-1',
-                                  'D=M',	# D=*SP
-                                  'A=A+1',	# Get to the place where address is stored
-                                  'A=M',	# Get to the place where address points to
-                                  'M=D',	# Write value stored in D to M
-                                  '@SP',
-                                  'M=M-1',	# SP--
+                                  *self.asm_code_memory_pop_address_in_D,
                                  ]
         return assembly_codes
 
-    def write(self):
-        """Translate and write translated assembly code to out_file"""
+    def translate(self):
+        """Translate vm code to assembly"""
         output_codes = []
         for filename, command_contents in self.code_contents.items():
             for command_index, command_content in enumerate(command_contents):
@@ -238,6 +157,11 @@ class CodeWriter:
                     assembly_codes = self.translate_push_pop(filename, cmd_type, memory_segment, memory_index)
                 output_codes.append('// {}'.format(command))	# Write command itself as comment for inspection
                 output_codes += assembly_codes
+        return output_codes
+
+    def write(self):
+        """Translate and write translated assembly code to out_file"""
+        output_codes = self.translate()
         with open(self.out_file, 'w', encoding='utf_8') as outf:
             for code_line in output_codes:
                 outf.write(str(code_line) + '\n')
