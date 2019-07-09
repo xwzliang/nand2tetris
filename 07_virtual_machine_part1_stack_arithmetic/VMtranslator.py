@@ -1,12 +1,17 @@
 #!/usr/bin/python3
 
-from sys import argv
+import argparse
 from pathlib import Path
 
 from parser import Parser
 from code_writer import CodeWriter
 
-path_input = Path(argv[1])
+arg_parser = argparse.ArgumentParser(description='Translate vm code into assembly code')
+arg_parser.add_argument('path_input', help='The path for vm file *.vm or the directory path which contains *.vm files')
+args = arg_parser.parse_args()
+
+
+path_input = Path(args.path_input)
 assert path_input.exists(), "Path not exists."
 
 if path_input.is_dir():	# Translate all vm files in directory
