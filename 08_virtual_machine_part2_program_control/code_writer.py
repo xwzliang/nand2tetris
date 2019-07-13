@@ -34,6 +34,13 @@ class CodeWriter:
                               '@SP',
                               'M=M+1',	# SP++
                 ]
+        self.asm_code_memory_push_0 = [
+                              '@SP',
+                              'A=M',
+                              'M=0',	# *SP=0
+                              '@SP',
+                              'M=M+1',	# SP++
+                ]
         self.asm_code_memory_pop_address_in_D = [
                               '@SP',
                               'A=M',	# Get to the place which SP points to
@@ -46,6 +53,28 @@ class CodeWriter:
                               '@SP',
                               'M=M-1',	# SP--
                 ]
+
+    def asm_code_memory_push_content_in_pointer(self, pointer_name):
+        """Push the content of the pointer (LCL, ARG, THIS or THAT) to the stack"""
+        assembly_codes = [
+                '@{}'.format(pointer_name),
+                'D=M',
+                *self.asm_code_memory_push_content_in_D
+                ]
+        return assembly_codes
+
+    def asm_code_memory_restore_pointer_value(self, pointer_name, num_above_LCL):
+        """Restore the value of pointer, given the pointer name and the location number above LCL"""
+        assembly_codes = [
+                '@{}'.format(num_above_LCL),
+                'D=A',
+                '@LCL',
+                'A=M-D',
+                'D=M',
+                '@{}'.format(pointer_name),
+                'M=D',	# Restore the value of pointer (pointer_name) of the caller: pointer_name=*(LCL-num_above_LCL)
+                ]
+        return assembly_codes
 
     def translate_arithmetic(self, filename, operator, command_index):
         """Generate the assembly code that is the translation of the given arithmetic command."""
@@ -166,6 +195,70 @@ class CodeWriter:
                 ]
         return assembly_codes
 
+    def translate_function(self, function_name, local_variable_num):
+        """Writes assembly code that effects the function command."""
+        assembly_codes = [
+                '({})'.format(function_name),	# Generate a label of function_name
+                ] + int(local_variable_num) * self.asm_code_memory_push_0	# Initialize all local_variable_num of varibles to 0 by push 0 to stack
+        return assembly_codes
+
+    def translate_call_function(self, function_name, function_arg_num):
+        """Writes assembly code that effects the call command."""
+        return_address_label = '(return_address_{})'.format(function_name)
+        assembly_codes = [
+                '@{}'.format(return_address_label),
+                'D=A',
+                *self.asm_code_memory_push_content_in_D,		# push return address to stack
+                *self.asm_code_memory_push_content_in_pointer('LCL'),		# push content of LCL to stack
+                *self.asm_code_memory_push_content_in_pointer('ARG'),		# push content of ARG to stack
+                *self.asm_code_memory_push_content_in_pointer('THIS'),		# push content of THIS to stack
+                *self.asm_code_memory_push_content_in_pointer('THAT'),		# push content of THAT to stack
+                '@5',
+                'D=A',	# D=5
+                '@{}'.format(function_arg_num),
+                'D=D+A',	# D=function_arg_num + 5
+                '@SP',
+                'D=M-D',	# D=SP - function_arg_num - 5
+                '@ARG',
+                'M=D',	# Reposition ARG, ARG=SP - function_arg_num - 5
+                '@SP',
+                'D=M',
+                '@LCL',
+                'M=D',	# Reposition LCL, LCL=SP
+                '@{}'.format(function_name),
+                '0;JMP',	# Jump to function_name label
+                return_address_label,	# Define return_address_label
+                ]
+        return assembly_codes
+
+    def translate_return(self):
+        """Writes assembly code that effects the return command."""
+        assembly_codes = [
+                *self.asm_code_memory_restore_pointer_value('R5', 5),	# Put the return address of the caller to the temp location (R5) in RAM: R5=*(LCL-5)
+                '@SP',
+                'A=M-1',
+                'D=M',	# Put content of *(SP-1) to D
+                '@ARG',
+                'A=M',
+                'M=D',	# Put the returned value to *ARG: *ARG=*(SP-1): Put content of D to *ARG
+                '@ARG',
+                'D=M+1',
+                '@SP',
+                'M=D',	# Restore SP of the caller: SP=ARG+1
+                '@LCL',
+                'A=M-1',
+                'D=M',
+                '@THAT',
+                'M=D',	# Restore THAT of the caller: THAT=*(LCL-1)
+                *self.asm_code_memory_restore_pointer_value('THIS', 2),	# Restore THIS of the caller: THIS=*(LCL-2)
+                *self.asm_code_memory_restore_pointer_value('ARG', 3),	# Restore ARG of the caller: ARG=*(LCL-3)
+                *self.asm_code_memory_restore_pointer_value('LCL', 4),	# Restore LCL of the caller: LCL=*(LCL-4),
+                '@R5',
+                'A=M',
+                '0;JMP',	# Go to the return address stored in R5
+                ]
+        return assembly_codes
+
     def translate(self):
         """Translate vm code to assembly"""
         output_codes = []
@@ -191,6 +284,15 @@ class CodeWriter:
                 elif cmd_type == 'C_IF':
                     label_name, = command_content[1]
                     assembly_codes = self.translate_if_goto(filename, label_name)	# Add filename to label name to ensure the label is unique
+
+                elif cmd_type == 'C_FUNCTION':
+                    function_name, local_variable_num = command_content[1]
+                    assembly_codes = self.translate_function(function_name, local_variable_num)
+                elif cmd_type == 'C_CALL':
+                    function_name, function_arg_num = command_content[1]
+                    assembly_codes = self.translate_call_function(function_name, function_arg_num)
+                else:	# cmd_type == 'C_RETURN':
+                    assembly_codes = self.translate_return()
 
                 output_codes.append('// {}'.format(command))	# Write command itself as comment for inspection
                 output_codes += assembly_codes
