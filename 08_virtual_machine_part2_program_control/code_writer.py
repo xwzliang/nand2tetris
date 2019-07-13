@@ -140,6 +140,32 @@ class CodeWriter:
                                  ]
         return assembly_codes
 
+    def translate_label(self, filename, label_name):
+        """Writes assembly code that effects the label command."""
+        assembly_codes = [
+                '({}_{})'.format(label_name, filename),
+                ]
+        return assembly_codes
+
+    def translate_goto(self, filename, label_name):
+        """Writes assembly code that effects the goto command."""
+        assembly_codes = [
+                '@{}_{}'.format(label_name, filename),
+                '0;JMP',
+                ]
+        return assembly_codes
+
+    def translate_if_goto(self, filename, label_name):
+        """Writes assembly code that effects the if-goto command."""
+        assembly_codes = [
+                '@SP',
+                'AM=M-1',	# SP--, A=M-1
+                'D=M',	# Store the value at top of stack to D register
+                '@{}_{}'.format(label_name, filename),
+                'D;JNE',	# If D != 0, then jump
+                ]
+        return assembly_codes
+
     def translate(self):
         """Translate vm code to assembly"""
         output_codes = []
@@ -155,6 +181,17 @@ class CodeWriter:
                 elif cmd_type == 'C_PUSH' or cmd_type == 'C_POP':
                     memory_segment, memory_index = command_content[1]
                     assembly_codes = self.translate_push_pop(filename, cmd_type, memory_segment, memory_index)
+
+                elif cmd_type == 'C_LABEL':
+                    label_name, = command_content[1]
+                    assembly_codes = self.translate_label(filename, label_name)	# Add filename to label name to ensure the label is unique
+                elif cmd_type == 'C_GOTO':
+                    label_name, = command_content[1]
+                    assembly_codes = self.translate_goto(filename, label_name)	# Add filename to label name to ensure the label is unique
+                elif cmd_type == 'C_IF':
+                    label_name, = command_content[1]
+                    assembly_codes = self.translate_if_goto(filename, label_name)	# Add filename to label name to ensure the label is unique
+
                 output_codes.append('// {}'.format(command))	# Write command itself as comment for inspection
                 output_codes += assembly_codes
         return output_codes
