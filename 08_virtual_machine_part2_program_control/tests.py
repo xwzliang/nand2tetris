@@ -30,5 +30,9 @@ class VMtranslator(unittest.TestCase):
         vm_file = self.cwd / 'test/ProgramFlow/FibonacciSeries/FibonacciSeries.vm'
         self.run_test(vm_file)
 
+    def test_function_calls_simple_function_test(self):
+        vm_file = self.cwd / 'test/FunctionCalls/SimpleFunction/SimpleFunction.vm'
+        self.run_test(vm_file)
+
 if __name__ == '__main__':
     unittest.main()
