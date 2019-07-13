@@ -204,7 +204,7 @@ class CodeWriter:
 
     def translate_call_function(self, function_name, function_arg_num):
         """Writes assembly code that effects the call command."""
-        return_address_label = '(return_address_{})'.format(function_name)
+        return_address_label = 'return_address_{}'.format(function_name)
         assembly_codes = [
                 '@{}'.format(return_address_label),
                 'D=A',
@@ -227,7 +227,7 @@ class CodeWriter:
                 'M=D',	# Reposition LCL, LCL=SP
                 '@{}'.format(function_name),
                 '0;JMP',	# Jump to function_name label
-                return_address_label,	# Define return_address_label
+                '({})'.format(return_address_label),	# Define return_address_label
                 ]
         return assembly_codes
 
