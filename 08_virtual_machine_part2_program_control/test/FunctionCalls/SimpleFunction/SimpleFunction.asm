@@ -82,7 +82,7 @@ D=A
 @LCL
 A=M-D
 D=M
-@R5
+@return_temp_var_0
 M=D
 @SP
 A=M-1
@@ -120,6 +120,6 @@ A=M-D
 D=M
 @LCL
 M=D
-@R5
+@return_temp_var_0
 A=M
 0;JMP
