@@ -4,6 +4,7 @@ class CodeWriter:
         self.out_file = out_file
         self.code_contents = code_contents
         self.setup_for_asm_code_translation()
+        self.function_call_times = 0	# Use this to count the function calls, which helps to generate unique function return label
 
     def setup_for_asm_code_translation(self):
         """Initialize common stuff which will be used in asm code translation"""
@@ -204,7 +205,8 @@ class CodeWriter:
 
     def translate_call_function(self, function_name, function_arg_num):
         """Writes assembly code that effects the call command."""
-        return_address_label = 'return_address_{}'.format(function_name)
+        self.function_call_times += 1	# Every time this function is called, function_call_times += 1
+        return_address_label = 'return_address_{}_{}'.format(function_name, self.function_call_times)	# Use function_call_times to generate uniqu return label
         assembly_codes = [
                 '@{}'.format(return_address_label),
                 'D=A',
@@ -233,8 +235,9 @@ class CodeWriter:
 
     def translate_return(self):
         """Writes assembly code that effects the return command."""
+        return_temp_var = 'return_temp_var_{}'.format(self.function_call_times)
         assembly_codes = [
-                *self.asm_code_memory_restore_pointer_value('R5', 5),	# Put the return address of the caller to the temp location (R5) in RAM: R5=*(LCL-5)
+                *self.asm_code_memory_restore_pointer_value(return_temp_var, 5),	# Put the return address of the caller to the temp location (R5) in RAM: R5=*(LCL-5)
                 '@SP',
                 'A=M-1',
                 'D=M',	# Put content of *(SP-1) to D
@@ -253,7 +256,7 @@ class CodeWriter:
                 *self.asm_code_memory_restore_pointer_value('THIS', 2),	# Restore THIS of the caller: THIS=*(LCL-2)
                 *self.asm_code_memory_restore_pointer_value('ARG', 3),	# Restore ARG of the caller: ARG=*(LCL-3)
                 *self.asm_code_memory_restore_pointer_value('LCL', 4),	# Restore LCL of the caller: LCL=*(LCL-4),
-                '@R5',
+                '@{}'.format(return_temp_var),
                 'A=M',
                 '0;JMP',	# Go to the return address stored in R5
                 ]
@@ -298,9 +301,28 @@ class CodeWriter:
                 output_codes += assembly_codes
         return output_codes
 
+    def write_bootstrap_code(self):
+        """Writes assembly code that effects the VM initialization, also called bootstrap code. This code must be placed at the beginning of the output file."""
+        assembly_codes = [
+                '// SP=256',
+                '@256',
+                'D=A',
+                '@SP',
+                'M=D',	# SP=256
+                '// call Sys.init 0',
+                *self.translate_call_function('Sys.init', 0),
+                ]
+        return assembly_codes
+
     def write(self):
         """Translate and write translated assembly code to out_file"""
-        output_codes = self.translate()
+        sys_vm_file = self.out_file.parent / 'Sys.vm'
+        if sys_vm_file.exists():
+            # if Sys.vm exists, write bootstrap code at beginning of the output_codes
+            output_codes = self.write_bootstrap_code() + self.translate()
+        else:
+            output_codes = self.translate()
+
         with open(self.out_file, 'w', encoding='utf_8') as outf:
             for code_line in output_codes:
                 outf.write(str(code_line) + '\n')
