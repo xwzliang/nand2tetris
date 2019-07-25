@@ -17,8 +17,12 @@ class JackAnalyzer(unittest.TestCase):
         cmp_xml_file = out_xml_file.parent / 'given_cmp_file' / out_xml_file.name
         cmp_token_xml_file = out_token_xml_file.parent / 'given_cmp_file' / out_token_xml_file.name
         self.assertTrue(out_token_xml_file.exists())
+        # Compare for out_token_xml_file
         proc_compare_token_xml = sp.run([self.given_compare_tool.as_posix(), out_token_xml_file, cmp_token_xml_file], stdout=sp.PIPE, universal_newlines=True)
         self.assertEqual(proc_compare_token_xml.stdout, 'Comparison ended successfully\n')
+        # Compare for out_xml_file
+        proc_compare_xml = sp.run([self.given_compare_tool.as_posix(), out_xml_file, cmp_xml_file], stdout=sp.PIPE, universal_newlines=True)
+        self.assertEqual(proc_compare_xml.stdout, 'Comparison ended successfully\n')
 
     def run_test(self, jack_path_input):
         # Run my JackAnalyzer to generate xml file
