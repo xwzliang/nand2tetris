@@ -21,6 +21,7 @@ class JackTokenizer:
         tokens_with_tokenType = self.generate_type_for_tokens(tokens)
         output_for_write = self.generate_output_for_tokens(tokens_with_tokenType)
         self.write_output(output_for_write)
+        return tokens_with_tokenType
 
     def process_input(self):
         self.skip = False
