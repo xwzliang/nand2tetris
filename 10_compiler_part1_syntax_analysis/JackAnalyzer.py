@@ -13,19 +13,19 @@ args = arg_parser.parse_args()
 path_input = Path(args.path_input)
 assert path_input.exists(), "Path does not exist."
 
-if path_input.is_dir():	# Compile all jack files in directory
-    jackfiles = [f for f in path_input.glob('*.jack')]
-    assert jackfiles, "No jack file in this directory."
-    for jackfile in jackfiles:
-        out_xml_file = jackfile.with_suffix('.xml')
-        out_token_xml_file = jackfile.parent / (jackfile.stem + 'T.xml')
-        jack_tokenizer = JackTokenizer(jackfile, out_token_xml_file)
-        jack_tokenizer.tokenize()
-else:	# Compile one jack file
-    jackfile = path_input
+def compile_jack(jackfile):
     out_xml_file = jackfile.with_suffix('.xml')
     out_token_xml_file = jackfile.parent / (jackfile.stem + 'T.xml')
     jack_tokenizer = JackTokenizer(jackfile, out_token_xml_file)
     jack_tokenizer.tokenize()
+
+if path_input.is_dir():	# Compile all jack files in directory
+    jackfiles = [f for f in path_input.glob('*.jack')]
+    assert jackfiles, "No jack file in this directory."
+    for jackfile in jackfiles:
+        compile_jack(jackfile)
+else:	# Compile one jack file
+    jackfile = path_input
+    compile_jack(jackfile)
 
 print('Done')
