@@ -32,7 +32,7 @@ class CompilationEngine:
 
     def add_sub_element(self, parent, element_tag, element_text):
         new_element = etree.SubElement(parent, element_tag)
-        new_element.text = element_text
+        new_element.text = ' ' + element_text + ' '
 
     def next_token_and_type(self):
         return self.tokens_with_tokenType.pop(0)
@@ -45,22 +45,52 @@ class CompilationEngine:
         self.compile_new_token_ensure_token('class', self.compiled_output_root)
         self.compile_new_token_ensure_token_type('identifier', self.compiled_output_root)
         self.compile_new_token_ensure_token('{', self.compiled_output_root)
+        self.compile_classVarDec_or_subroutineDec_or_right_curly_brace()
+
+    def compile_classVarDec_or_subroutineDec_or_right_curly_brace(self):
         token, token_type = self.next_token_and_type()
         if token in {'static', 'field'}:
-            self.compile_class_var_dec(token, token_type)
+            self.compile_classVarDec(token_type, token)
+            self.compile_classVarDec_or_subroutineDec_or_right_curly_brace()
         elif token in {'constructor', 'function', 'method'}:
-            self.compile_subroutine_dec(token, token_type)
+            self.compile_subroutineDec(token_type, token)
         elif token == '}':
             self.add_sub_element(self.compiled_output_root, token, token_type)
 
-    def compile_class_var_dec(self, token, token_type):
+    def compile_classVarDec(self, token_type, token):
         """
         Compiles a static declaration or a field declaration.
         classVarDec: ('static' | 'field') type varName (',' varName)* ';'
         """
-        pass
+        compiled_output_class_var_dec = etree.SubElement(self.compiled_output_root, 'classVarDec')
+        self.add_sub_element(compiled_output_class_var_dec, token_type, token)
+        self.compile_type(compiled_output_class_var_dec)
+        self.compile_one_or_more_varName_and_semicolon(compiled_output_class_var_dec)
 
-    def compile_subroutine_dec(self, token, token_type):
+    def compile_one_or_more_varName_and_semicolon(self, parent):
+        self.compile_new_token_ensure_token_type('identifier', parent)
+        self.compile_more_varName_or_semicolon(parent)
+
+    def compile_more_varName_or_semicolon(self, parent):
+        """If there is more varName, compiles them, else compile semicolon to end var declare"""
+        token, token_type = self.next_token_and_type()
+        if token == ',':	# More VarName need to add
+            self.add_sub_element(parent, token_type, token)	# Add ','
+            self.compile_new_token_ensure_token_type('identifier', parent)
+            self.compile_more_varName_or_semicolon(parent)
+        else:
+            assert token == ';'
+            self.add_sub_element(parent, token_type, token)	# Add ';'
+
+    def compile_type(self, parent):
+        """
+        Compiles type for var and add token element to parent.
+        type: 'int' | 'char' | 'boolean' | className
+        """
+        token, token_type = self.compile_new_token(parent)
+        assert token in {'int', 'char', 'boolean'} or token_type == 'identifier'
+
+    def compile_subroutineDec(self, token, token_type):
         """
         Compiles a complete method, function, or constructor.
         subroutineDec: ('constructor' | 'function' | 'method') ('void' | type) subroutineName '(' parameterList ')' subroutineBody
