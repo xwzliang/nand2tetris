@@ -148,7 +148,7 @@ class CompilationEngine:
             self.add_sub_element(compiled_output_subroutineBody, token_type, token)	# Add '}'
         else:	# statements
             compiled_output_statements = etree.SubElement(compiled_output_subroutineBody, 'statements')
-            self.compile_statements_and_right_curly_brace(compiled_output_statements, token_type, token)
+            self.compile_statements_and_right_curly_brace(compiled_output_subroutineBody, compiled_output_statements, token_type, token)
 
     def compile_more_parameter_or_right_parenthese(self, parent_subroutineDec, parent_parameterList):
         token, token_type = self.next_token_and_type()
@@ -175,9 +175,9 @@ class CompilationEngine:
             self.add_sub_element(parent, token_type, token)	# Add '}'
         else:	# statements
             compiled_output_statements = etree.SubElement(parent, 'statements')
-            self.compile_statements_and_right_curly_brace(compiled_output_statements, token_type, token)
+            self.compile_statements_and_right_curly_brace(parent, compiled_output_statements, token_type, token)
 
-    def compile_statements_and_right_curly_brace(self, parent, token_type, token):
+    def compile_statements_and_right_curly_brace(self, grandparent, parent, token_type, token):
         """statement: letStatement | ifStatement | whileStatement | doStatement | returnStatement"""
         assert token in {'let', 'if', 'while', 'do', 'return'}, '{} is not correct'.format(token)
         if token == 'let':
@@ -192,16 +192,16 @@ class CompilationEngine:
             self.compile_statement_return(parent, token_type, token)
         token, token_type = self.next_token_and_type()
         if token == '}':
-            self.add_sub_element(parent, token_type, token)	# Add '}'
+            self.add_sub_element(grandparent, token_type, token)	# Add '}'
         else:	# More statements to be added
-            self.compile_statements_and_right_curly_brace(parent, token_type, token)
+            self.compile_statements_and_right_curly_brace(grandparent, parent, token_type, token)
 
-    def compile_zero_or_more_statements_and_right_curly_brace(self, parent):
+    def compile_zero_or_more_statements_and_right_curly_brace(self, grandparent, parent):
         token, token_type = self.next_token_and_type()
         if token == '}':
-            self.add_sub_element(parent, token_type, token)	# Add '}'
+            self.add_sub_element(grandparent, token_type, token)	# Add '}'
         else:	# More statements to be added
-            self.compile_statements_and_right_curly_brace(parent, token_type, token)
+            self.compile_statements_and_right_curly_brace(grandparent, parent, token_type, token)
 
     def compile_statement_let(self, parent, token_type, token):
         """
@@ -232,12 +232,14 @@ class CompilationEngine:
         self.compile_expression(compiled_output_statement)
         self.compile_new_token_ensure_token(')', compiled_output_statement)
         self.compile_new_token_ensure_token('{', compiled_output_statement)
-        self.compile_zero_or_more_statements_and_right_curly_brace(compiled_output_statement)
+        compiled_output_statements_if = etree.SubElement(compiled_output_statement, 'statements')
+        self.compile_zero_or_more_statements_and_right_curly_brace(compiled_output_statement, compiled_output_statements_if)
         next_token = self.show_next_token()
         if next_token == 'else':
             self.compile_new_token_ensure_token('else', compiled_output_statement)
             self.compile_new_token_ensure_token('{', compiled_output_statement)
-            self.compile_zero_or_more_statements_and_right_curly_brace(compiled_output_statement)
+            compiled_output_statements_else = etree.SubElement(compiled_output_statement, 'statements')
+            self.compile_zero_or_more_statements_and_right_curly_brace(compiled_output_statement, compiled_output_statements_else)
 
     def compile_statement_while(self, parent, token_type, token):
         """
@@ -249,7 +251,8 @@ class CompilationEngine:
         self.compile_expression(compiled_output_statement)
         self.compile_new_token_ensure_token(')', compiled_output_statement)
         self.compile_new_token_ensure_token('{', compiled_output_statement)
-        self.compile_zero_or_more_statements_and_right_curly_brace(compiled_output_statement)
+        compiled_output_statements_while = etree.SubElement(compiled_output_statement, 'statements')
+        self.compile_zero_or_more_statements_and_right_curly_brace(compiled_output_statement, compiled_output_statements_while)
 
     def compile_statement_do(self, parent, token_type, token):
         """
@@ -315,8 +318,8 @@ class CompilationEngine:
             compiled_output_expressionList.text = '\n\t'
             return
         else:
-            self.compile_expression(parent)
-            self.compile_comma_and_expression(parent)
+            self.compile_expression(compiled_output_expressionList)
+            self.compile_comma_and_expression(compiled_output_expressionList)
 
     def compile_comma_and_expression(self, parent):
         next_token = self.show_next_token()
