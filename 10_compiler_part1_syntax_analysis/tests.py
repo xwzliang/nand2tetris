@@ -21,6 +21,7 @@ class JackAnalyzer(unittest.TestCase):
         proc_compare_token_xml = sp.run([self.given_compare_tool.as_posix(), out_token_xml_file, cmp_token_xml_file], stdout=sp.PIPE, universal_newlines=True)
         self.assertEqual(proc_compare_token_xml.stdout, 'Comparison ended successfully\n')
         # Compare for out_xml_file
+        print('Comparing {} and {}'.format(out_xml_file, cmp_xml_file))
         proc_compare_xml = sp.run([self.given_compare_tool.as_posix(), out_xml_file, cmp_xml_file], stdout=sp.PIPE, universal_newlines=True)
         self.assertEqual(proc_compare_xml.stdout, 'Comparison ended successfully\n')
 
