@@ -41,6 +41,9 @@ class CompilationEngine:
         token, token_type = self.tokens_with_tokenType[0]
         return token
 
+    def show_next_token_and_type(self):
+        return self.tokens_with_tokenType[0]
+
     def compile_class(self):
         """
         Compiles a complete class.
@@ -261,17 +264,22 @@ class CompilationEngine:
         compiled_output_statement= etree.SubElement(parent, 'doStatement')
         self.add_sub_element(compiled_output_statement, token_type, token)	# Add 'do'
         # subroutineCall
-        # subroutineCall: subroutineName '(' expressionList ')' | (className | varName) '.' subroutineName '(' expressionList ')'
-        self.compile_new_token_ensure_token_type('identifier', compiled_output_statement)	# subroutineName or className or varName
+        self.compile_subroutineCall(compiled_output_statement)
+        self.compile_new_token_ensure_token(';', compiled_output_statement)
+
+    def compile_subroutineCall(self, parent):
+        """
+        subroutineCall: subroutineName '(' expressionList ')' | (className | varName) '.' subroutineName '(' expressionList ')'
+        """
+        self.compile_new_token_ensure_token_type('identifier', parent)	# subroutineName or className or varName
         next_token = self.show_next_token()
         if next_token == '.':
-            self.compile_new_token_ensure_token('.', compiled_output_statement)
-            self.compile_new_token_ensure_token_type('identifier', compiled_output_statement)	# subroutineName
+            self.compile_new_token_ensure_token('.', parent)
+            self.compile_new_token_ensure_token_type('identifier', parent)	# subroutineName
 
-        self.compile_new_token_ensure_token('(', compiled_output_statement)
-        self.compile_expressionList(compiled_output_statement)
-        self.compile_new_token_ensure_token(')', compiled_output_statement)
-        self.compile_new_token_ensure_token(';', compiled_output_statement)
+        self.compile_new_token_ensure_token('(', parent)
+        self.compile_expressionList(parent)
+        self.compile_new_token_ensure_token(')', parent)
 
     def compile_statement_return(self, parent, token_type, token):
         """
@@ -293,9 +301,37 @@ class CompilationEngine:
         self.compile_zero_or_more_op_and_term(compiled_output_expression)
 
     def compile_term(self, parent):
+        """
+        term: integerConstant | stringConstant | keywordConstant | varName | varName '[' expression ']' | subroutineCall | '(' expression ')' | unaryOp term
+        """
         compiled_output_term = etree.SubElement(parent, 'term')
-        # Simplify the situation first: only one token added
-        self.compile_new_token(compiled_output_term)
+        next_token, token_type = self.show_next_token_and_type()
+        if token_type == 'integerConstant' or next_token in {'true', 'false', 'null', 'this'}:	# integerConstant or keywordConstant
+            self.compile_new_token(compiled_output_term)
+        elif token_type == 'stringConstant':
+            token, token_type = self.next_token_and_type()
+            # remove dowble quote symbol in token
+            self.add_sub_element(compiled_output_term, token_type, token[1:-1])
+        elif token_type == 'identifier':
+            next_token, token_type = self.tokens_with_tokenType[1]
+            if next_token == '[':
+                self.compile_new_token_ensure_token_type('identifier', compiled_output_term)
+                self.compile_new_token_ensure_token('[', compiled_output_term)
+                self.compile_expression(compiled_output_term)
+                self.compile_new_token_ensure_token(']', compiled_output_term)
+            elif next_token == '(' or next_token == '.':
+                self.compile_subroutineCall(compiled_output_term)
+            else:	# A single varName
+                self.compile_new_token_ensure_token_type('identifier', compiled_output_term)
+        elif next_token == '(':
+            self.compile_new_token(compiled_output_term)
+            self.compile_expression(compiled_output_term)
+            self.compile_new_token_ensure_token(')', compiled_output_term)
+        elif next_token in {'-', '~'}:	# unaryOp
+            self.compile_new_token(compiled_output_term)
+            self.compile_term(compiled_output_term)
+        else:
+            raise 'Not a valid expression'
 
     def compile_zero_or_more_op_and_term(self, parent):
         """
