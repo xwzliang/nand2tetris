@@ -115,29 +115,40 @@ class CompilationEngine:
             self.compile_new_token_ensure_token_type('identifier', compiled_output_subroutineDec)
             self.compile_new_token_ensure_token('(', compiled_output_subroutineDec)
             # parameterList
-            compiled_output_parameterList = etree.SubElement(compiled_output_subroutineDec, 'parameterList')
-            token, token_type = self.show_next_token_and_type()
-            if token == ')':	# No parameter need to add
-                compiled_output_parameterList.text = '\n\t'	# change the print format of empty element compiled_output_parameterList
-            else:	# There is at least one parameter needs to be added
-                # type
-                assert token in {'int', 'char', 'boolean'} or token_type == 'identifier'
-                self.compile_new_token(compiled_output_parameterList)	# Add type
-                # varName
-                self.compile_new_token_ensure_token_type('identifier', compiled_output_parameterList)
-                # more paremeters
-                self.compile_more_parameter(compiled_output_parameterList)
+            self.compile_parameterList(compiled_output_subroutineDec)
             self.compile_new_token_ensure_token(')', compiled_output_subroutineDec)
             # subroutineBody
-            # subroutineBody: '{' varDec* statements '}'
-            compiled_output_subroutineBody = etree.SubElement(compiled_output_subroutineDec, 'subroutineBody')
-            self.compile_new_token_ensure_token('{', compiled_output_subroutineBody)
-            self.compile_varDec(compiled_output_subroutineBody)
-            compiled_output_statements = etree.SubElement(compiled_output_subroutineBody, 'statements')
-            self.compile_statements(compiled_output_statements)
-            self.compile_new_token_ensure_token('}', compiled_output_subroutineBody)
+            self.compile_subroutineBody(compiled_output_subroutineDec)
             # Recursive call
             self.compile_subroutineDec()
+
+    def compile_parameterList(self, parent):
+        """
+        ((type varName) (',' type varName)*)?
+        """
+        compiled_output_parameterList = etree.SubElement(parent, 'parameterList')
+        token, token_type = self.show_next_token_and_type()
+        if token == ')':	# No parameter need to add
+            compiled_output_parameterList.text = '\n\t'	# change the print format of empty element compiled_output_parameterList
+        else:	# There is at least one parameter needs to be added
+            # type
+            assert token in {'int', 'char', 'boolean'} or token_type == 'identifier'
+            self.compile_new_token(compiled_output_parameterList)	# Add type
+            # varName
+            self.compile_new_token_ensure_token_type('identifier', compiled_output_parameterList)
+            # more paremeters
+            self.compile_more_parameter(compiled_output_parameterList)
+
+    def compile_subroutineBody(self, parent):
+        """
+        subroutineBody: '{' varDec* statements '}'
+        """
+        compiled_output_subroutineBody = etree.SubElement(parent, 'subroutineBody')
+        self.compile_new_token_ensure_token('{', compiled_output_subroutineBody)
+        self.compile_varDec(compiled_output_subroutineBody)
+        compiled_output_statements = etree.SubElement(compiled_output_subroutineBody, 'statements')
+        self.compile_statements(compiled_output_statements)
+        self.compile_new_token_ensure_token('}', compiled_output_subroutineBody)
 
     def compile_more_parameter(self, parent):
         token = self.show_next_token()
