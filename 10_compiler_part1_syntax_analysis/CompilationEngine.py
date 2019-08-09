@@ -77,7 +77,7 @@ class CompilationEngine:
         self.compile_more_varName_if_exist(parent)
 
     def compile_more_varName_if_exist(self, parent):
-        """If there is more varName, compiles them, else compile semicolon to end var declare"""
+        """If there is more varName, compiles them"""
         token = self.show_next_token()
         if token == ',':	# More VarName need to add
             self.compile_new_token(parent)	# Add ','

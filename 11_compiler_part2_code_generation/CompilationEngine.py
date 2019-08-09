@@ -88,7 +88,7 @@ class CompilationEngine:
         self.symbol_table.define(symbol_name, symbol_type, symbol_kind)
 
     def compile_more_varName_if_exist(self, parent, symbol_type, symbol_kind):
-        """If there is more varName, compiles them, else compile semicolon to end var declare"""
+        """If there is more varName, compiles them"""
         token = self.show_next_token()
         if token == ',':	# More VarName need to add
             self.compile_new_token(parent)	# Add ','
