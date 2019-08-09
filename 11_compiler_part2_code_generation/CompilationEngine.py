@@ -1,11 +1,14 @@
 # import xml.etree.ElementTree as etree
 from lxml import etree
 
+from SymbolTable import SymbolTable
+
 class CompilationEngine:
     """CompilationEngine: Effects the actual compilation output. Gets its input from a JackTokenizer and emits its parsed structure into an output file/stream."""
     def __init__(self, tokens_with_tokenType, out_xml_file):
         self.tokens_with_tokenType = tokens_with_tokenType
         self.out_xml_file = out_xml_file
+        self.symbol_table = SymbolTable()
 
     def compile(self):
         compiled_etree = self.compile_tokens()
@@ -53,6 +56,7 @@ class CompilationEngine:
         self.compile_new_token_ensure_token_type('identifier', self.compiled_output_root)
         self.compile_new_token_ensure_token('{', self.compiled_output_root)
         self.compile_classVarDec()
+        # print(self.symbol_table.symbol_table_class)
         self.compile_subroutineDec()
         self.compile_new_token_ensure_token('}', self.compiled_output_root)
 
@@ -64,26 +68,34 @@ class CompilationEngine:
         token = self.show_next_token()
         if token in {'static', 'field'}:
             compiled_output_class_var_dec = etree.SubElement(self.compiled_output_root, 'classVarDec')
+            symbol_kind = token.upper()
             # Add static or field
             self.compile_new_token(compiled_output_class_var_dec)
-            self.compile_type(compiled_output_class_var_dec)
-            self.compile_one_or_more_varName(compiled_output_class_var_dec)
+            symbol_type = self.compile_type(compiled_output_class_var_dec)
+            self.compile_one_or_more_varName(compiled_output_class_var_dec, symbol_type, symbol_kind)
             self.compile_new_token_ensure_token(';', compiled_output_class_var_dec)
             # Recursive call
             self.compile_classVarDec()
 
-    def compile_one_or_more_varName(self, parent):
+    def compile_one_or_more_varName(self, parent, symbol_type, symbol_kind):
+        self.add_new_symbol(symbol_type, symbol_kind)
         self.compile_new_token_ensure_token_type('identifier', parent)
-        self.compile_more_varName_if_exist(parent)
+        self.compile_more_varName_if_exist(parent, symbol_type, symbol_kind)
 
-    def compile_more_varName_if_exist(self, parent):
+    def add_new_symbol(self, symbol_type, symbol_kind):
+        """Next token is symbol_name, add this symbol_name and its symbol_type and symbol_kind to self.symbol_table"""
+        symbol_name = self.show_next_token()
+        self.symbol_table.define(symbol_name, symbol_type, symbol_kind)
+
+    def compile_more_varName_if_exist(self, parent, symbol_type, symbol_kind):
         """If there is more varName, compiles them, else compile semicolon to end var declare"""
         token = self.show_next_token()
         if token == ',':	# More VarName need to add
             self.compile_new_token(parent)	# Add ','
+            self.add_new_symbol(symbol_type, symbol_kind)
             self.compile_new_token_ensure_token_type('identifier', parent)
             # Recursive call
-            self.compile_more_varName_if_exist(parent)
+            self.compile_more_varName_if_exist(parent, symbol_type, symbol_kind)
 
     def compile_type(self, parent):
         """
@@ -92,6 +104,7 @@ class CompilationEngine:
         """
         token, token_type = self.compile_new_token(parent)
         assert token in {'int', 'char', 'boolean'} or token_type == 'identifier'
+        return token
 
     def compile_void_or_type(self, parent):
         """
@@ -107,6 +120,7 @@ class CompilationEngine:
         """
         token = self.show_next_token()
         if token in {'constructor', 'function', 'method'}:
+            self.symbol_table.start_subroutine()	# Reset the subroutine's symbol table
             compiled_output_subroutineDec = etree.SubElement(self.compiled_output_root, 'subroutineDec')
             # Add token in {'constructor', 'function', 'method'} to compiled_output_subroutineDec
             self.compile_new_token(compiled_output_subroutineDec)
@@ -119,6 +133,9 @@ class CompilationEngine:
             self.compile_new_token_ensure_token(')', compiled_output_subroutineDec)
             # subroutineBody
             self.compile_subroutineBody(compiled_output_subroutineDec)
+
+            # print(self.symbol_table.symbol_table_subroutine)
+
             # Recursive call
             self.compile_subroutineDec()
 
@@ -133,7 +150,10 @@ class CompilationEngine:
         else:	# There is at least one parameter needs to be added
             # type
             assert token in {'int', 'char', 'boolean'} or token_type == 'identifier'
+            symbol_kind = 'ARG'
+            symbol_type = token
             self.compile_new_token(compiled_output_parameterList)	# Add type
+            self.add_new_symbol(symbol_type, symbol_kind)
             # varName
             self.compile_new_token_ensure_token_type('identifier', compiled_output_parameterList)
             # more paremeters
@@ -154,7 +174,9 @@ class CompilationEngine:
         token = self.show_next_token()
         if token == ',':	# More parameter need to add
             self.compile_new_token(parent)	# Add ','
-            self.compile_type(parent)
+            symbol_kind = 'ARG'
+            symbol_type = self.compile_type(parent)
+            self.add_new_symbol(symbol_type, symbol_kind)
             self.compile_new_token_ensure_token_type('identifier', parent)
             # Recursive call
             self.compile_more_parameter(parent)
@@ -164,10 +186,12 @@ class CompilationEngine:
         token = self.show_next_token()
         if token == 'var':
             compiled_output_varDec = etree.SubElement(parent, 'varDec')
+            symbol_kind = token.upper()
             self.compile_new_token(compiled_output_varDec)	# Add 'var'
-            self.compile_type(compiled_output_varDec)
+            symbol_type = self.compile_type(compiled_output_varDec)
+            self.add_new_symbol(symbol_type, symbol_kind)
             self.compile_new_token_ensure_token_type('identifier', compiled_output_varDec)
-            self.compile_more_varName_if_exist(compiled_output_varDec)
+            self.compile_more_varName_if_exist(compiled_output_varDec, symbol_type, symbol_kind)
             self.compile_new_token_ensure_token(';', compiled_output_varDec)
             # Recursive call
             self.compile_varDec(parent)
