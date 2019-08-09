@@ -5,14 +5,14 @@ from SymbolTable import SymbolTable
 
 class CompilationEngine:
     """CompilationEngine: Effects the actual compilation output. Gets its input from a JackTokenizer and emits its parsed structure into an output file/stream."""
-    def __init__(self, tokens_with_tokenType, out_xml_file):
+    def __init__(self, tokens_with_tokenType, out_vm_file):
         self.tokens_with_tokenType = tokens_with_tokenType
-        self.out_xml_file = out_xml_file
+        self.out_vm_file = out_vm_file
         self.symbol_table = SymbolTable()
 
     def compile(self):
         compiled_etree = self.compile_tokens()
-        self.write_output(compiled_etree)
+        # print(etree.tounicode(compiled_etree, pretty_print=True))
 
     def compile_tokens(self):
         self.compiled_output_root = etree.Element('class')
@@ -372,7 +372,3 @@ class CompilationEngine:
             self.compile_expression(parent)
             # Recursive call
             self.compile_comma_and_expression(parent)
-
-    def write_output(self, compiled_etree):
-        with open(self.out_xml_file, 'w', encoding='utf_8') as outf:
-            outf.write(etree.tounicode(compiled_etree, pretty_print=True))

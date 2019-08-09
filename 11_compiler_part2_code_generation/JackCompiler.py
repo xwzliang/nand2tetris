@@ -7,13 +7,12 @@ from JackTokenizer import JackTokenizer
 from CompilationEngine import CompilationEngine
 
 def compile_jack(jackfile):
-    out_xml_file = jackfile.with_suffix('.xml')
-    out_token_xml_file = jackfile.parent / (jackfile.stem + 'T.xml')
+    out_vm_file = jackfile.with_suffix('.vm')
     # Tokenize
-    jack_tokenizer = JackTokenizer(jackfile, out_token_xml_file)
+    jack_tokenizer = JackTokenizer(jackfile)
     tokens_with_tokenType = jack_tokenizer.tokenize()
     # Compile
-    jack_compilation_engine = CompilationEngine(tokens_with_tokenType, out_xml_file)
+    jack_compilation_engine = CompilationEngine(tokens_with_tokenType, out_vm_file)
     jack_compilation_engine.compile()
 
 def main():

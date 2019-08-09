@@ -2,9 +2,8 @@ import re
 
 class JackTokenizer:
     """JackTokenizer: Removes all comments and white space from the input stream and breaks it into Jack-language tokens, as specified by the Jack grammar"""
-    def __init__(self, in_file, out_file):
+    def __init__(self, in_file):
         self.in_file = in_file
-        self.out_file = out_file
         self.construct_symbols()
         self.construct_keywords()
 
@@ -20,7 +19,6 @@ class JackTokenizer:
         tokens = self.process_input()
         tokens_with_tokenType = self.generate_type_for_tokens(tokens)
         output_for_write = self.generate_output_for_tokens(tokens_with_tokenType)
-        self.write_output(output_for_write)
         return tokens_with_tokenType
 
     def process_input(self):
@@ -123,11 +121,4 @@ class JackTokenizer:
             output_line = '<{0}> {1} </{0}>'.format(token_type, token_for_write)
             output_for_write.append(output_line)
         return output_for_write
-
-    def write_output(self, output_for_write):
-        with open(self.out_file, 'w', encoding='utf_8') as outf:
-            outf.write('<tokens>\n')
-            for line in output_for_write:
-                outf.write(line+'\n')
-            outf.write('</tokens>\n')
 
