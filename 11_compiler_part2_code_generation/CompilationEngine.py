@@ -2,17 +2,32 @@
 from lxml import etree
 
 from SymbolTable import SymbolTable
+from VMWriter import VMWriter
 
 class CompilationEngine:
     """CompilationEngine: Effects the actual compilation output. Gets its input from a JackTokenizer and emits its parsed structure into an output file/stream."""
     def __init__(self, tokens_with_tokenType, out_vm_file):
         self.tokens_with_tokenType = tokens_with_tokenType
-        self.out_vm_file = out_vm_file
         self.symbol_table = SymbolTable()
+        self.vm_writer = VMWriter(out_vm_file)
+        self.class_name = out_vm_file.stem
+        self.construct_op_dict()
+
+    def construct_op_dict(self):
+        self.op_dict = {
+                '+': 'add',
+                '-': 'sub',
+                '&': 'and',
+                '|': 'or',
+                '<': 'lt',
+                '>': 'gt',
+                '=': 'eq',
+                }
 
     def compile(self):
         compiled_etree = self.compile_tokens()
         # print(etree.tounicode(compiled_etree, pretty_print=True))
+        self.vm_writer.close()
 
     def compile_tokens(self):
         self.compiled_output_root = etree.Element('class')
@@ -126,13 +141,14 @@ class CompilationEngine:
             self.compile_new_token(compiled_output_subroutineDec)
             self.compile_void_or_type(compiled_output_subroutineDec)
             # subroutineName
+            function_name = self.class_name + '.' + self.show_next_token()
             self.compile_new_token_ensure_token_type('identifier', compiled_output_subroutineDec)
             self.compile_new_token_ensure_token('(', compiled_output_subroutineDec)
             # parameterList
             self.compile_parameterList(compiled_output_subroutineDec)
             self.compile_new_token_ensure_token(')', compiled_output_subroutineDec)
             # subroutineBody
-            self.compile_subroutineBody(compiled_output_subroutineDec)
+            self.compile_subroutineBody(compiled_output_subroutineDec, function_name)
 
             # print(self.symbol_table.symbol_table_subroutine)
 
@@ -159,13 +175,15 @@ class CompilationEngine:
             # more paremeters
             self.compile_more_parameter(compiled_output_parameterList)
 
-    def compile_subroutineBody(self, parent):
+    def compile_subroutineBody(self, parent, function_name):
         """
         subroutineBody: '{' varDec* statements '}'
         """
         compiled_output_subroutineBody = etree.SubElement(parent, 'subroutineBody')
         self.compile_new_token_ensure_token('{', compiled_output_subroutineBody)
         self.compile_varDec(compiled_output_subroutineBody)
+        local_vars_num = self.symbol_table.count_symbol_by_kind('VAR')
+        self.vm_writer.write_function(function_name, local_vars_num)
         compiled_output_statements = etree.SubElement(compiled_output_subroutineBody, 'statements')
         self.compile_statements(compiled_output_statements)
         self.compile_new_token_ensure_token('}', compiled_output_subroutineBody)
@@ -273,20 +291,24 @@ class CompilationEngine:
         self.compile_new_token_ensure_token('do', compiled_output_statement)
         # subroutineCall
         self.compile_subroutineCall(compiled_output_statement)
+        # When translating a do sub statement where sub is a void method or function, the caller of the corresponding VM function must pop (and ignore) the returned value (which is always the constant 0).
+        self.vm_writer.write_pop('temp', 0)
         self.compile_new_token_ensure_token(';', compiled_output_statement)
 
     def compile_subroutineCall(self, parent):
         """
         subroutineCall: subroutineName '(' expressionList ')' | (className | varName) '.' subroutineName '(' expressionList ')'
         """
+        function_name = self.show_next_token()
         self.compile_new_token_ensure_token_type('identifier', parent)	# subroutineName or className or varName
         next_token = self.show_next_token()
         if next_token == '.':
             self.compile_new_token_ensure_token('.', parent)
+            function_name += '.' + self.show_next_token()
             self.compile_new_token_ensure_token_type('identifier', parent)	# subroutineName
 
         self.compile_new_token_ensure_token('(', parent)
-        self.compile_expressionList(parent)
+        self.compile_expressionList(parent, function_name)
         self.compile_new_token_ensure_token(')', parent)
 
     def compile_statement_return(self, parent):
@@ -298,6 +320,10 @@ class CompilationEngine:
         next_token = self.show_next_token()
         if next_token != ';':	# has expression
             self.compile_expression(compiled_output_statement)
+        else:
+            # void functions return the constant 0
+            self.vm_writer.write_push('constant', 0)
+        self.vm_writer.write_return()
         self.compile_new_token_ensure_token(';', compiled_output_statement)
 
     def compile_expression(self, parent):
@@ -315,6 +341,8 @@ class CompilationEngine:
         compiled_output_term = etree.SubElement(parent, 'term')
         next_token, token_type = self.show_next_token_and_type()
         if token_type == 'integerConstant' or next_token in {'true', 'false', 'null', 'this'}:	# integerConstant or keywordConstant
+            if token_type == 'integerConstant':
+                self.vm_writer.write_push('constant', next_token)
             self.compile_new_token(compiled_output_term)
         elif token_type == 'stringConstant':
             token, token_type = self.next_token_and_type()
@@ -349,10 +377,18 @@ class CompilationEngine:
         if next_token in {'+', '-', '*', '/', '&', '|', '<', '>', '='}:	# in op
             self.compile_new_token(parent)	# add op
             self.compile_term(parent)
+            # Write vm code for operator
+            if next_token == '*':
+                self.vm_writer.write_call('Math.multiply', 2)
+            elif next_token == '/':
+                self.vm_writer.write_call('Math.divide', 2)
+            else:
+                operator = self.op_dict[next_token]
+                self.vm_writer.write_arithmetic(operator)
             # Recursive call
             self.compile_zero_or_more_op_and_term(parent)
 
-    def compile_expressionList(self, parent):
+    def compile_expressionList(self, parent, function_name):
         """
         expressionList: (expression (',' expression)* )?
         """
@@ -361,14 +397,18 @@ class CompilationEngine:
         if next_token == ')':
             # No expression
             compiled_output_expressionList.text = '\n\t'
+            self.vm_writer.write_call(function_name, 0)
         else:
             self.compile_expression(compiled_output_expressionList)
+            self.args_num = 1
             self.compile_comma_and_expression(compiled_output_expressionList)
+            self.vm_writer.write_call(function_name, self.args_num)
 
     def compile_comma_and_expression(self, parent):
         next_token = self.show_next_token()
         if next_token == ',':
             self.compile_new_token_ensure_token(',', parent)
+            self.args_num += 1
             self.compile_expression(parent)
             # Recursive call
             self.compile_comma_and_expression(parent)
