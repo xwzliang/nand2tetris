@@ -43,7 +43,7 @@ class VMWriter:
         command = 'goto {}'.format(label)
         self.outf.write(command + '\n')
 
-    def write_if(self, label):
+    def write_if_goto(self, label):
         """Writes a VM if-goto command"""
         command = 'if-goto {}'.format(label)
         self.outf.write(command + '\n')
