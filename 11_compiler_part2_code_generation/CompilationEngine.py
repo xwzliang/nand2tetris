@@ -12,6 +12,9 @@ class CompilationEngine:
         self.vm_writer = VMWriter(out_vm_file)
         self.class_name = out_vm_file.stem
         self.construct_op_dict()
+        self.construct_segment_dict()
+        self.while_label_index = 0
+        self.if_else_label_index = 0
 
     def construct_op_dict(self):
         self.op_dict = {
@@ -22,6 +25,13 @@ class CompilationEngine:
                 '<': 'lt',
                 '>': 'gt',
                 '=': 'eq',
+                }
+
+    def construct_segment_dict(self):
+        """Translate the kind of variable to related memory segment name"""
+        self.segment_dict = {
+                'ARG': 'argument',
+                'VAR': 'local',
                 }
 
     def compile(self):
@@ -234,10 +244,12 @@ class CompilationEngine:
     def compile_statement_let(self, parent):
         """
         letStatement: 'let' varName ('[' expression ']')? '=' expression ';'
+        vm: pop the value of expression to varName
         """
         compiled_output_statement = etree.SubElement(parent, 'letStatement')
         self.compile_new_token_ensure_token('let', compiled_output_statement)
         # varName
+        symbol_name = self.show_next_token()
         self.compile_new_token_ensure_token_type('identifier', compiled_output_statement)
         token = self.show_next_token()
         if token == '[':
@@ -246,21 +258,42 @@ class CompilationEngine:
             self.compile_new_token_ensure_token(']', compiled_output_statement)
         self.compile_new_token_ensure_token('=', compiled_output_statement)	# Add '='
         self.compile_expression(compiled_output_statement)
+        self.write_pop_variable(symbol_name)
         self.compile_new_token_ensure_token(';', compiled_output_statement)
 
     def compile_statement_if(self, parent):
         """
         ifStatement: 'if' '(' expression ')' '{' statements '}' ('else' '{' statements '}')?
+        code:
+        	if (cond)
+                    s1
+                else
+                    s2
+        vm:
+        	VM code for computing ~(cond)
+                if-goto L1
+                VM code for executing s1
+                goto L2
+                label L1
+                VM code for executing s2
+                label L2
         """
         compiled_output_statement= etree.SubElement(parent, 'ifStatement')
         self.compile_new_token_ensure_token('if', compiled_output_statement)
+        self.if_else_label_index += 1
+        else_start_label_name = 'ELSE_START_{}_{}'.format(self.class_name.upper(), self.if_else_label_index) 
+        if_else_end_label_name = 'IF_ELSE_END_{}_{}'.format(self.class_name.upper(), self.if_else_label_index) 
         self.compile_new_token_ensure_token('(', compiled_output_statement)
         self.compile_expression(compiled_output_statement)
+        self.vm_writer.write_arithmetic('not')
+        self.vm_writer.write_if_goto(else_start_label_name)
         self.compile_new_token_ensure_token(')', compiled_output_statement)
         self.compile_new_token_ensure_token('{', compiled_output_statement)
         compiled_output_statements_if = etree.SubElement(compiled_output_statement, 'statements')
         self.compile_statements(compiled_output_statements_if)
+        self.vm_writer.write_goto(if_else_end_label_name)
         self.compile_new_token_ensure_token('}', compiled_output_statement)
+        self.vm_writer.write_label(else_start_label_name)
         next_token = self.show_next_token()
         if next_token == 'else':
             self.compile_new_token_ensure_token('else', compiled_output_statement)
@@ -268,19 +301,38 @@ class CompilationEngine:
             compiled_output_statements_else = etree.SubElement(compiled_output_statement, 'statements')
             self.compile_statements(compiled_output_statements_else)
             self.compile_new_token_ensure_token('}', compiled_output_statement)
+        self.vm_writer.write_label(if_else_end_label_name)
 
     def compile_statement_while(self, parent):
         """
         whileStatement: 'while' '(' expression ')' '{' statements '}'
+        code: 
+            while (cond) 
+                s1
+        vm:
+            label L1
+            VM code for computing ~(cond)
+            if-goto L2
+            VM code for executing s1
+            goto L1
+            label L2
         """
         compiled_output_statement= etree.SubElement(parent, 'whileStatement')
         self.compile_new_token_ensure_token('while', compiled_output_statement)
+        self.while_label_index += 1
+        while_start_label_name = 'WHILE_START_{}_{}'.format(self.class_name.upper(), self.while_label_index) 
+        while_end_label_name = 'WHILE_END_{}_{}'.format(self.class_name.upper(), self.while_label_index) 
+        self.vm_writer.write_label(while_start_label_name)
         self.compile_new_token_ensure_token('(', compiled_output_statement)
         self.compile_expression(compiled_output_statement)
+        self.vm_writer.write_arithmetic('not')
+        self.vm_writer.write_if_goto(while_end_label_name)
         self.compile_new_token_ensure_token(')', compiled_output_statement)
         self.compile_new_token_ensure_token('{', compiled_output_statement)
         compiled_output_statements_while = etree.SubElement(compiled_output_statement, 'statements')
         self.compile_statements(compiled_output_statements_while)
+        self.vm_writer.write_goto(while_start_label_name)
+        self.vm_writer.write_label(while_end_label_name)
         self.compile_new_token_ensure_token('}', compiled_output_statement)
 
     def compile_statement_do(self, parent):
@@ -343,21 +395,29 @@ class CompilationEngine:
         if token_type == 'integerConstant' or next_token in {'true', 'false', 'null', 'this'}:	# integerConstant or keywordConstant
             if token_type == 'integerConstant':
                 self.vm_writer.write_push('constant', next_token)
+            elif next_token == 'true':
+                # true = -1, which is 16 bit each bit is 1
+                self.vm_writer.write_push('constant', 1)
+                self.vm_writer.write_arithmetic('neg')
+            elif next_token == 'false' or next_token == 'null':
+                self.vm_writer.write_push('constant', 0)
             self.compile_new_token(compiled_output_term)
         elif token_type == 'stringConstant':
             token, token_type = self.next_token_and_type()
             # remove dowble quote symbol in token
             self.add_sub_element(compiled_output_term, token_type, token[1:-1])
         elif token_type == 'identifier':
-            next_token, token_type = self.tokens_with_tokenType[1]
-            if next_token == '[':
+            next_next_token, token_type = self.tokens_with_tokenType[1]
+            if next_next_token == '[':
                 self.compile_new_token_ensure_token_type('identifier', compiled_output_term)
                 self.compile_new_token_ensure_token('[', compiled_output_term)
                 self.compile_expression(compiled_output_term)
                 self.compile_new_token_ensure_token(']', compiled_output_term)
-            elif next_token == '(' or next_token == '.':
+            elif next_next_token == '(' or next_next_token == '.':
                 self.compile_subroutineCall(compiled_output_term)
             else:	# A single varName
+                symbol_name = next_token
+                self.write_push_variable(symbol_name)
                 self.compile_new_token_ensure_token_type('identifier', compiled_output_term)
         elif next_token == '(':
             self.compile_new_token(compiled_output_term)
@@ -366,6 +426,10 @@ class CompilationEngine:
         elif next_token in {'-', '~'}:	# unaryOp
             self.compile_new_token(compiled_output_term)
             self.compile_term(compiled_output_term)
+            if next_token == '-':
+                self.vm_writer.write_arithmetic('neg')
+            else:
+                self.vm_writer.write_arithmetic('not')
         else:
             raise 'Not a valid expression'
 
@@ -412,3 +476,17 @@ class CompilationEngine:
             self.compile_expression(parent)
             # Recursive call
             self.compile_comma_and_expression(parent)
+
+    def write_push_variable(self, symbol_name):
+        """Push the value of variable to working stack"""
+        index = self.symbol_table.get_symbol_index(symbol_name)
+        symbol_kind = self.symbol_table.get_symbol_kind(symbol_name)
+        segment = self.segment_dict[symbol_kind]
+        self.vm_writer.write_push(segment, index)
+
+    def write_pop_variable(self, symbol_name):
+        """Pop the top value of the working stack to variable"""
+        index = self.symbol_table.get_symbol_index(symbol_name)
+        symbol_kind = self.symbol_table.get_symbol_kind(symbol_name)
+        segment = self.segment_dict[symbol_kind]
+        self.vm_writer.write_pop(segment, index)
