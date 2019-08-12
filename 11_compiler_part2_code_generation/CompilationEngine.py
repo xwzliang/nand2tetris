@@ -30,6 +30,7 @@ class CompilationEngine:
     def construct_segment_dict(self):
         """Translate the kind of variable to related memory segment name"""
         self.segment_dict = {
+                'FIELD': 'this',
                 'ARG': 'argument',
                 'VAR': 'local',
                 }
@@ -146,6 +147,7 @@ class CompilationEngine:
         token = self.show_next_token()
         if token in {'constructor', 'function', 'method'}:
             self.symbol_table.start_subroutine()	# Reset the subroutine's symbol table
+            function_kind = token
             compiled_output_subroutineDec = etree.SubElement(self.compiled_output_root, 'subroutineDec')
             # Add token in {'constructor', 'function', 'method'} to compiled_output_subroutineDec
             self.compile_new_token(compiled_output_subroutineDec)
@@ -155,10 +157,13 @@ class CompilationEngine:
             self.compile_new_token_ensure_token_type('identifier', compiled_output_subroutineDec)
             self.compile_new_token_ensure_token('(', compiled_output_subroutineDec)
             # parameterList
+            if function_kind == 'method':
+                # this is a dummy symbol added to the symbol_table's ARG, for the side effect that method's number of arguments will add 1. A method with k arguments operates on k+1 arguments actually, and the first argument (argument number 0) always refers to the this object
+                self.symbol_table.define('this', 'int', 'ARG')
             self.compile_parameterList(compiled_output_subroutineDec)
             self.compile_new_token_ensure_token(')', compiled_output_subroutineDec)
             # subroutineBody
-            self.compile_subroutineBody(compiled_output_subroutineDec, function_name)
+            self.compile_subroutineBody(compiled_output_subroutineDec, function_name, function_kind)
 
             # print(self.symbol_table.symbol_table_subroutine)
 
@@ -185,7 +190,7 @@ class CompilationEngine:
             # more paremeters
             self.compile_more_parameter(compiled_output_parameterList)
 
-    def compile_subroutineBody(self, parent, function_name):
+    def compile_subroutineBody(self, parent, function_name, function_kind):
         """
         subroutineBody: '{' varDec* statements '}'
         """
@@ -194,6 +199,16 @@ class CompilationEngine:
         self.compile_varDec(compiled_output_subroutineBody)
         local_vars_num = self.symbol_table.count_symbol_by_kind('VAR')
         self.vm_writer.write_function(function_name, local_vars_num)
+        if function_kind == 'constructor':
+            # translate this=Memory.alloc(fields_num)
+            fields_num = self.symbol_table.count_symbol_by_kind('FIELD')
+            self.vm_writer.write_push('constant', fields_num)
+            self.vm_writer.write_call('Memory.alloc', 1)
+            self.vm_writer.write_pop('pointer', 0)
+        elif function_kind == 'method':
+            # Point the virtual this segment to the current object (using pointer 0)
+            self.vm_writer.write_push('argument', 0)	# In method, this object address will always be stored in the first argument
+            self.vm_writer.write_pop('pointer', 0)
         compiled_output_statements = etree.SubElement(compiled_output_subroutineBody, 'statements')
         self.compile_statements(compiled_output_statements)
         self.compile_new_token_ensure_token('}', compiled_output_subroutineBody)
@@ -351,16 +366,30 @@ class CompilationEngine:
         """
         subroutineCall: subroutineName '(' expressionList ')' | (className | varName) '.' subroutineName '(' expressionList ')'
         """
-        function_name = self.show_next_token()
+        name = self.show_next_token()
         self.compile_new_token_ensure_token_type('identifier', parent)	# subroutineName or className or varName
         next_token = self.show_next_token()
         if next_token == '.':
             self.compile_new_token_ensure_token('.', parent)
-            function_name += '.' + self.show_next_token()
+            symbol_type = self.symbol_table.get_symbol_type(name)
+            if not symbol_type:
+                # Not defined in symbol_table, so name must be className, and function name is simply className.subroutineName, needs not to be changed
+                function_name = name + '.' + self.show_next_token()
+                args_num_should_add_1 = False
+            else:
+                # name is varName, so it is an instance of a className, className is symbol_type, so we push the value of the varName first, which is the base address of the class instance, then set the function name to  className.subroutineName
+                args_num_should_add_1 = True
+                self.write_push_variable(name)
+                function_name = symbol_type + '.' + self.show_next_token()
             self.compile_new_token_ensure_token_type('identifier', parent)	# subroutineName
+        else:
+            # no '.' found, so name is subroutineName, function name should be self.class_name.subroutineName, and we need push this (pointer 0) first
+            self.vm_writer.write_push('pointer', 0)
+            function_name = self.class_name + '.' + name
+            args_num_should_add_1 = True
 
         self.compile_new_token_ensure_token('(', parent)
-        self.compile_expressionList(parent, function_name)
+        self.compile_expressionList(parent, function_name, args_num_should_add_1)
         self.compile_new_token_ensure_token(')', parent)
 
     def compile_statement_return(self, parent):
@@ -401,6 +430,9 @@ class CompilationEngine:
                 self.vm_writer.write_arithmetic('neg')
             elif next_token == 'false' or next_token == 'null':
                 self.vm_writer.write_push('constant', 0)
+            else:	# next_token == 'this'
+                # this will always be the content of pointer 0
+                self.vm_writer.write_push('pointer', 0)
             self.compile_new_token(compiled_output_term)
         elif token_type == 'stringConstant':
             token, token_type = self.next_token_and_type()
@@ -452,19 +484,23 @@ class CompilationEngine:
             # Recursive call
             self.compile_zero_or_more_op_and_term(parent)
 
-    def compile_expressionList(self, parent, function_name):
+    def compile_expressionList(self, parent, function_name, args_num_should_add_1):
         """
         expressionList: (expression (',' expression)* )?
         """
         compiled_output_expressionList = etree.SubElement(parent, 'expressionList')
+        self.args_num = 0
+        if args_num_should_add_1:
+            # if function_name is varName.subroutineName or self.class_name.subroutineName, the number of arguments should add 1 because we first push the base address of the operated object
+            self.args_num += 1
         next_token = self.show_next_token()
         if next_token == ')':
             # No expression
             compiled_output_expressionList.text = '\n\t'
-            self.vm_writer.write_call(function_name, 0)
+            self.vm_writer.write_call(function_name, self.args_num)
         else:
             self.compile_expression(compiled_output_expressionList)
-            self.args_num = 1
+            self.args_num += 1
             self.compile_comma_and_expression(compiled_output_expressionList)
             self.vm_writer.write_call(function_name, self.args_num)
 
