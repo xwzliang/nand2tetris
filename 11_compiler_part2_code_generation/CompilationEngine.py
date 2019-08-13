@@ -38,6 +38,7 @@ class CompilationEngine:
 
     def compile(self):
         compiled_etree = self.compile_tokens()
+        # Uncomment following line if you want to see the output of compiled element tree
         # print(etree.tounicode(compiled_etree, pretty_print=True))
         self.vm_writer.close()
 
@@ -83,7 +84,6 @@ class CompilationEngine:
         self.compile_new_token_ensure_token_type('identifier', self.compiled_output_root)
         self.compile_new_token_ensure_token('{', self.compiled_output_root)
         self.compile_classVarDec()
-        # print(self.symbol_table.symbol_table_class)
         self.compile_subroutineDec()
         self.compile_new_token_ensure_token('}', self.compiled_output_root)
 
@@ -165,8 +165,6 @@ class CompilationEngine:
             self.compile_new_token_ensure_token(')', compiled_output_subroutineDec)
             # subroutineBody
             self.compile_subroutineBody(compiled_output_subroutineDec, function_name, function_kind)
-
-            # print(self.symbol_table.symbol_table_subroutine)
 
             # Recursive call
             self.compile_subroutineDec()
@@ -474,13 +472,13 @@ class CompilationEngine:
             if next_next_token == '[':	# Array
                 """
                 code: 
-                	a[i]
+                    a[i]
                 vm:
-                	push a
-                        push i
-                        add
-                        pop pointer 1
-                        push that 0
+                    push a
+                    push i
+                    add
+                    pop pointer 1
+                    push that 0
                 """
                 symbol_name = next_token
                 self.write_push_variable(symbol_name)
