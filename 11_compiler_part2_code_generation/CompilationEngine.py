@@ -267,13 +267,30 @@ class CompilationEngine:
         symbol_name = self.show_next_token()
         self.compile_new_token_ensure_token_type('identifier', compiled_output_statement)
         token = self.show_next_token()
-        if token == '[':
+        if token == '[':	# Array
+            """
+            // bar[k]=19, or *(bar+k)=19 
+            push bar 
+            push k 
+            add 
+            // Use a pointer to access x[k] (use that segment)
+            pop addr // addr points to bar[k] 
+            push 19 
+            pop *addr // Set bar[k] to 19
+            """
+            self.write_push_variable(symbol_name)
             self.compile_new_token(compiled_output_statement)	# Add '['
             self.compile_expression(compiled_output_statement)
+            self.vm_writer.write_arithmetic('add')
+            self.vm_writer.write_pop('pointer', 1)
             self.compile_new_token_ensure_token(']', compiled_output_statement)
         self.compile_new_token_ensure_token('=', compiled_output_statement)	# Add '='
         self.compile_expression(compiled_output_statement)
-        self.write_pop_variable(symbol_name)
+        if token == '[':	# Array
+            # Array assignment always first align that to the address to be modified, then "pop that 0"
+            self.vm_writer.write_pop('that', 0)
+        else:	# a varName
+            self.write_pop_variable(symbol_name)
         self.compile_new_token_ensure_token(';', compiled_output_statement)
 
     def compile_statement_if(self, parent):
@@ -436,14 +453,27 @@ class CompilationEngine:
             self.compile_new_token(compiled_output_term)
         elif token_type == 'stringConstant':
             token, token_type = self.next_token_and_type()
-            # remove dowble quote symbol in token
-            self.add_sub_element(compiled_output_term, token_type, token[1:-1])
+            # remove double quote symbol in token
+            string = token[1:-1]
+            # Push string using OS String: String.new(length), String.appendChar(nextChar)
+            self.vm_writer.write_push('constant', len(string))
+            self.vm_writer.write_call('String.new', 1)
+            for char in string:
+                self.vm_writer.write_push('constant', ord(char))
+                self.vm_writer.write_call('String.appendChar', 2)
+            self.add_sub_element(compiled_output_term, token_type, string)
         elif token_type == 'identifier':
             next_next_token, token_type = self.tokens_with_tokenType[1]
-            if next_next_token == '[':
+            if next_next_token == '[':	# Array
+                symbol_name = next_token
+                self.write_push_variable(symbol_name)
                 self.compile_new_token_ensure_token_type('identifier', compiled_output_term)
                 self.compile_new_token_ensure_token('[', compiled_output_term)
                 self.compile_expression(compiled_output_term)
+                self.vm_writer.write_arithmetic('add')
+                self.vm_writer.write_pop('pointer', 1)
+                # Push the value of the array item to stack using segment that
+                self.vm_writer.write_push('that', 0)
                 self.compile_new_token_ensure_token(']', compiled_output_term)
             elif next_next_token == '(' or next_next_token == '.':
                 self.compile_subroutineCall(compiled_output_term)
