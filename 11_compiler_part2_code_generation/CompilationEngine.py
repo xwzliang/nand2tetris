@@ -30,6 +30,7 @@ class CompilationEngine:
     def construct_segment_dict(self):
         """Translate the kind of variable to related memory segment name"""
         self.segment_dict = {
+                'STATIC': 'static',
                 'FIELD': 'this',
                 'ARG': 'argument',
                 'VAR': 'local',
