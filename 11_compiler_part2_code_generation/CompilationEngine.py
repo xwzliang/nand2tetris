@@ -270,25 +270,31 @@ class CompilationEngine:
         token = self.show_next_token()
         if token == '[':	# Array
             """
-            // bar[k]=19, or *(bar+k)=19 
-            push bar 
-            push k 
-            add 
-            // Use a pointer to access x[k] (use that segment)
-            pop addr // addr points to bar[k] 
-            push 19 
-            pop *addr // Set bar[k] to 19
+            code:
+                arr[expression1] = expression2
+            vm:
+            	push arr
+                push expression1
+                add
+                push expression2
+                pop temp 0
+                pop pointer 1
+                push temp 0
+                pop that 0
+            The reason to use temp 0 and delayed pop pointer 1 after push expression2 is that expression2 may also contain arrays, for example: a[i]=b[j], then the value in pointer 1 will mess up. So we must pop the returned value by expression2 to temp 0 for the rescue.
             """
             self.write_push_variable(symbol_name)
             self.compile_new_token(compiled_output_statement)	# Add '['
             self.compile_expression(compiled_output_statement)
             self.vm_writer.write_arithmetic('add')
-            self.vm_writer.write_pop('pointer', 1)
             self.compile_new_token_ensure_token(']', compiled_output_statement)
         self.compile_new_token_ensure_token('=', compiled_output_statement)	# Add '='
         self.compile_expression(compiled_output_statement)
         if token == '[':	# Array
             # Array assignment always first align that to the address to be modified, then "pop that 0"
+            self.vm_writer.write_pop('temp', 0)
+            self.vm_writer.write_pop('pointer', 1)
+            self.vm_writer.write_push('temp', 0)
             self.vm_writer.write_pop('that', 0)
         else:	# a varName
             self.write_pop_variable(symbol_name)
@@ -466,6 +472,16 @@ class CompilationEngine:
         elif token_type == 'identifier':
             next_next_token, token_type = self.tokens_with_tokenType[1]
             if next_next_token == '[':	# Array
+                """
+                code: 
+                	a[i]
+                vm:
+                	push a
+                        push i
+                        add
+                        pop pointer 1
+                        push that 0
+                """
                 symbol_name = next_token
                 self.write_push_variable(symbol_name)
                 self.compile_new_token_ensure_token_type('identifier', compiled_output_term)
