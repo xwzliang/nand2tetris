@@ -10,8 +10,9 @@ class OperatingSystem(unittest.TestCase):
     def setUp(self):
         self.cwd = Path.cwd()
         self.given_compile_tool = self.cwd.parent / 'tools/JackCompiler.sh'
+        self.given_vm_emulator_tool = self.cwd.parent / 'tools/VMEmulator.sh'
 
-    def copy_and_compile(self, jack_class):
+    def copy_compile_and_compare(self, jack_class, should_compare):
         test_dir = self.cwd / 'test' / (jack_class.stem + 'Test')
         # Copy jack class file to test_dir
         shutil.copy2(jack_class, test_dir)
@@ -20,10 +21,14 @@ class OperatingSystem(unittest.TestCase):
         jack_class_vm_file = test_dir / jack_class.with_suffix('.vm').name
         self.assertTrue(jack_class_vm_file.exists())
         # After compilation succeeds, still need to test using given VMEmulator.sh tool
+        if should_compare:
+            test_file = test_dir / (test_dir.name + '.tst')
+            proc_compare = sp.run([self.given_vm_emulator_tool.as_posix(), test_file.as_posix()], stdout=sp.PIPE, universal_newlines=True)
+            self.assertEqual(proc_compare.stdout, 'End of script - Comparison ended successfully\n')
 
     def test_class_Math(self):
         jack_class = self.cwd / 'Math.jack'
-        self.copy_and_compile(jack_class)
+        self.copy_compile_and_compare(jack_class, True)
 
 if __name__ == '__main__':
     unittest.main()
