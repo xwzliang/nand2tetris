@@ -9,12 +9,37 @@
  */
 class Math {
 
+	static Array twoToThe;	// Stores the value of two to the j for j in 0..15, used by bit function to get the j-th bit of an integer
+
     /** Initializes the library. */
     function void init() {
+		let twoToThe = Array.new(16);
+		let twoToThe[0] = 1;
+		let twoToThe[1] = 2;
+		let twoToThe[2] = 4;
+		let twoToThe[3] = 8;
+		let twoToThe[4] = 16;
+		let twoToThe[5] = 32;
+		let twoToThe[6] = 64;
+		let twoToThe[7] = 128;
+		let twoToThe[8] = 256;
+		let twoToThe[9] = 512;
+		let twoToThe[10] = 1024;
+		let twoToThe[11] = 2048;
+		let twoToThe[12] = 4096;
+		let twoToThe[13] = 8192;
+		let twoToThe[14] = 16384;
+		//let twoToThe[15] = -32768;
+		let twoToThe[15] = twoToThe[14] + twoToThe[14];	// 2's complement, in Jack minus sign is a unary operator, so 32768 would be too large for positive number
+		return;
     }
 
     /** Returns the absolute value of x. */
     function int abs(int x) {
+		if (x < 0) {
+			return -x;
+		}
+		return x;
     }
 
     /** Returns the product of x and y. 
@@ -23,7 +48,28 @@ class Math {
      *  the Jack expressions x*y and multiply(x,y) return the same value.
      */
     function int multiply(int x, int y) {
+		var int sum, bit_shifted_x;
+		var int j;
+
+		let sum = 0;
+		let bit_shifted_x = x;
+		let j = 0;
+
+		while (j < 16) {
+			if (Math.bit(y, j)) {
+				let sum = sum + bit_shifted_x;
+			}
+			// bit shift x equals x * 2, since Jack does not support bit shift operation
+			let bit_shifted_x = bit_shifted_x + bit_shifted_x;
+			let j = j + 1;
+		}
+		return sum;
     }
+
+    /** Returns true if the j-th bit of the integer x is 1 and false otherwise. */
+	function boolean bit(int x, int j) {
+		return x & twoToThe[j];
+	}
 
     /** Returns the integer part of x/y.
      *  When a Jack compiler detects the multiplication operator '/' in the 
@@ -31,17 +77,57 @@ class Math {
      *  the Jack expressions x/y and divide(x,y) return the same value.
      */
     function int divide(int x, int y) {
+		var int q;
+		var int sign;
+
+		if (((x < 0) & (y < 0)) | ((x > 0) & (y > 0))) {
+			let sign = 1;
+		} else {
+			let sign = -1;
+		}
+		let x = Math.abs(x);
+		let y = Math.abs(y);
+		if ((x < y) | (y < 0)) {	// Overflow when y < 0
+			return 0;
+		}
+		let q = Math.divide(x, 2 * y);
+		if ((x - (2 * q * y)) < y) {
+			return 2 * q * sign;
+		} else {
+			return (2 * q + 1) * sign;
+		}
     }
 
     /** Returns the integer part of the square root of x. */
     function int sqrt(int x) {
+		var int y, j;
+		var int approx, approx_squared;
+		let y = 0;
+		let j = 7;	// n/2-1, since Hack is 16-bit computer, n/2-1=7. Because x <= 2 ** n-1, so y <= 2 ** n/2-1
+		while (j > -1) {
+			let approx = y + twoToThe[j];
+			let approx_squared = approx * approx;
+			if (~(approx_squared > x) & (approx_squared > 0)) {		// Handle overflow
+				let y = approx;
+			}
+			let j = j - 1;
+		}
+		return y;
     }
 
     /** Returns the greater number. */
     function int max(int a, int b) {
+		if (a > b) {
+			return a;
+		}
+		return b;
     }
 
     /** Returns the smaller number. */
     function int min(int a, int b) {
+		if (a < b) {
+			return a;
+		}
+		return b;
     }
 }
