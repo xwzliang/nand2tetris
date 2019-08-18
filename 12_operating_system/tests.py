@@ -13,6 +13,7 @@ class OperatingSystem(unittest.TestCase):
         self.given_vm_emulator_tool = self.cwd.parent / 'tools/VMEmulator.sh'
 
     def copy_compile_and_compare(self, jack_class, should_compare):
+        # If use VMEmulator in command line (i.e. should_compare is True), you need copy all the OS vm files from tools folder first, then compile them using this script, but if in interactive mode, you wouldn't have to, this is just the limitation of the given program
         test_dir = self.cwd / 'test' / (jack_class.stem + 'Test')
         # Copy jack class file to test_dir
         shutil.copy2(jack_class, test_dir)
