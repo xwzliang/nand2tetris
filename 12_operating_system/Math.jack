@@ -77,24 +77,32 @@ class Math {
      *  the Jack expressions x/y and divide(x,y) return the same value.
      */
     function int divide(int x, int y) {
-		var int q;
 		var int sign;
+		var int abs_result;
+		var boolean is_neg_x, is_neg_y;
 
-		if (((x < 0) & (y < 0)) | ((x > 0) & (y > 0))) {
-			let sign = 1;
-		} else {
-			let sign = -1;
-		}
+		let is_neg_x = x < 0;
+		let is_neg_y = y < 0;
 		let x = Math.abs(x);
 		let y = Math.abs(y);
+		let abs_result = Math.divide_positive(x, y);
+		if (is_neg_x = is_neg_y) {
+			return abs_result;
+		} else {
+			return -abs_result;
+		}
+    }
+
+    function int divide_positive(int x, int y) {
+		var int q;
 		if ((x < y) | (y < 0)) {	// Overflow when y < 0
 			return 0;
 		}
 		let q = Math.divide(x, 2 * y);
 		if ((x - (2 * q * y)) < y) {
-			return 2 * q * sign;
+			return q + q;
 		} else {
-			return (2 * q + 1) * sign;
+			return q + q + 1;
 		}
     }
 
