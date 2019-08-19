@@ -39,5 +39,9 @@ class OperatingSystem(unittest.TestCase):
         jack_class = self.cwd / 'Array.jack'
         self.copy_compile_and_compare(jack_class, True)
 
+    def test_class_String(self):
+        jack_class = self.cwd / 'String.jack'
+        self.copy_compile_and_compare(jack_class, False)
+
 if __name__ == '__main__':
     unittest.main()
