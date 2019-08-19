@@ -1,0 +1,179 @@
+function Memory.init 0
+push constant 0
+pop static 0
+push constant 2048
+pop static 1
+push static 1
+push static 0
+add
+push constant 14334
+pop temp 0
+pop pointer 1
+push temp 0
+pop that 0
+push static 1
+push constant 1
+add
+push static 0
+add
+push constant 0
+pop temp 0
+pop pointer 1
+push temp 0
+pop that 0
+push constant 0
+return
+function Memory.peek 0
+push argument 0
+push static 0
+add
+pop pointer 1
+push that 0
+return
+function Memory.poke 0
+push argument 0
+push static 0
+add
+push argument 1
+pop temp 0
+pop pointer 1
+push temp 0
+pop that 0
+push constant 0
+return
+function Memory.alloc 0
+push static 1
+push argument 0
+call Memory.find_avail_and_alloc 2
+return
+function Memory.find_avail_and_alloc 3
+push argument 0
+push static 0
+add
+pop pointer 1
+push that 0
+pop local 1
+push argument 0
+push local 1
+add
+push constant 1
+add
+pop local 0
+push local 1
+push argument 1
+push constant 1
+add
+gt
+if-goto IF_TRUE0
+goto IF_FALSE0
+label IF_TRUE0
+push local 0
+push argument 1
+sub
+push constant 1
+add
+pop local 2
+push local 2
+push constant 1
+sub
+push static 0
+add
+push constant 0
+pop temp 0
+pop pointer 1
+push temp 0
+pop that 0
+push local 2
+push constant 2
+sub
+push static 0
+add
+push argument 1
+pop temp 0
+pop pointer 1
+push temp 0
+pop that 0
+push argument 0
+push static 0
+add
+push local 1
+push argument 1
+sub
+push constant 2
+sub
+pop temp 0
+pop pointer 1
+push temp 0
+pop that 0
+goto IF_END0
+label IF_FALSE0
+push argument 0
+push constant 1
+add
+push static 0
+add
+pop pointer 1
+push that 0
+not
+if-goto IF_TRUE1
+goto IF_FALSE1
+label IF_TRUE1
+push constant 0
+return
+goto IF_END1
+label IF_FALSE1
+push argument 0
+push constant 1
+add
+push static 0
+add
+pop pointer 1
+push that 0
+push argument 1
+call Memory.find_avail_and_alloc 2
+pop local 2
+label IF_END1
+label IF_END0
+push local 2
+return
+function Memory.deAlloc 0
+push static 1
+push argument 0
+call Memory.find_end_and_deAlloc 2
+pop temp 0
+push constant 0
+return
+function Memory.find_end_and_deAlloc 1
+push argument 0
+push constant 1
+add
+push static 0
+add
+pop pointer 1
+push that 0
+pop local 0
+push local 0
+if-goto IF_TRUE0
+goto IF_FALSE0
+label IF_TRUE0
+push local 0
+push argument 1
+call Memory.find_end_and_deAlloc 2
+pop temp 0
+goto IF_END0
+label IF_FALSE0
+push argument 0
+push constant 1
+add
+push static 0
+add
+push argument 1
+push constant 2
+sub
+pop temp 0
+pop pointer 1
+push temp 0
+pop that 0
+label IF_END0
+push constant 0
+return
