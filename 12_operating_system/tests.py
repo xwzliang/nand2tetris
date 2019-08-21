@@ -47,5 +47,9 @@ class OperatingSystem(unittest.TestCase):
         jack_class = self.cwd / 'Screen.jack'
         self.copy_compile_and_compare(jack_class, False)
 
+    def test_class_Output(self):
+        jack_class = self.cwd / 'Output.jack'
+        self.copy_compile_and_compare(jack_class, False)
+
 if __name__ == '__main__':
     unittest.main()
