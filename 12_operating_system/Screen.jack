@@ -16,6 +16,7 @@ class Screen {
 
     /** Initializes the Screen. */
     function void init() {
+		let color = true;	// Default color is black
 		let SCREEN_BASE = 16384;
 		let twoToThe = Array.new(16);
 		let twoToThe[0] = 1;
@@ -63,7 +64,7 @@ class Screen {
 		if (color) {
 			let memory_word_value = memory_word_value | twoToThe[x-(x/16*16)];
 		} else {
-			let memory_word_value = memory_word_value & ~twoToThe[15-(x-(x/16*16))];
+			let memory_word_value = memory_word_value & ~twoToThe[x-(x/16*16)];
 		}
 		do Memory.poke(memory_location, memory_word_value);
 		return;
@@ -83,7 +84,10 @@ class Screen {
 		return;
     }
 
-    function void drawLine_horizontal(int x1, int x2, int y2) {
+    function void drawLine_horizontal(int x1, int x2, int y1) {
+		var int memory_location_x1, memory_word_value_x1;
+		var int memory_location_x2, memory_word_value_x2;
+		var int x1_mod_16, x2_mod_16;
 		var int temp;
 		var int i;
 		if (x1 > x2) {	// Make sure x1 < x2
@@ -91,7 +95,36 @@ class Screen {
 			let x2 = x1;
 			let x1 = temp;
 		}
+		let memory_location_x1 = SCREEN_BASE + (x1 / 16) + (y1 * 32);
+		let memory_word_value_x1 =  Memory.peek(memory_location_x1);
+		let memory_location_x2 = memory_location_x1 + (x2 / 16) - (x1 / 16);
+		let memory_word_value_x2 =  Memory.peek(memory_location_x2);
+		let x1_mod_16 = x1 - (x1 / 16 * 16);
+		let x2_mod_16 = x2 - (x2 / 16 * 16);
 		let i = 0;
+		if (memory_location_x1 = memory_location_x2) {
+			if (color) {	// x1 and x2 are in the same memory word
+				let memory_word_value_x1 = memory_word_value_x1 | (twoToThe[x2_mod_16] + twoToThe[x2_mod_16] - twoToThe[x1_mod_16]);		// 2**x2_mod_16 + (2**x2_mod_16 - 1) - (2**x1_mod_16 - 1)
+			} else {
+				let memory_word_value_x1 = memory_word_value_x1 & ~(twoToThe[x2_mod_16] + twoToThe[x2_mod_16] - twoToThe[x1_mod_16]);
+			}
+			do Memory.poke(memory_location_x1, memory_word_value_x1);
+		} else {	// x1 and x2 are in two different memory words
+			if (color) {
+				let memory_word_value_x1 = memory_word_value_x1 | (-(twoToThe[x1_mod_16]));		// -1 - (2**(x mod 16) - 1)
+				let memory_word_value_x2 = memory_word_value_x2 | (twoToThe[x2_mod_16] + twoToThe[x2_mod_16] -1);
+			} else {
+				let memory_word_value_x1 = memory_word_value_x1 & ~(-(twoToThe[x1_mod_16]));
+				let memory_word_value_x2 = memory_word_value_x2 & ~(twoToThe[x2_mod_16] + twoToThe[x2_mod_16] -1);
+			}
+			do Memory.poke(memory_location_x1, memory_word_value_x1);
+			do Memory.poke(memory_location_x2, memory_word_value_x2);
+			let memory_location_x1 = memory_location_x1 + 1;
+			while (memory_location_x1 < memory_location_x2) {
+				do Memory.poke(memory_location_x1, color);
+				let memory_location_x1 = memory_location_x1 + 1;
+			}
+		}
 		return;
     }
 
@@ -148,11 +181,25 @@ class Screen {
     /** Draws a filled rectangle whose top left corner is (x1, y1)
      * and bottom right corner is (x2,y2), using the current color. */
     function void drawRectangle(int x1, int y1, int x2, int y2) {
+		while (~(y1 > y2)) {
+			do Screen.drawLine_horizontal(x1, x2, y1);
+			let y1 = y1 + 1;
+		}
 		return;
     }
 
     /** Draws a filled circle of radius r<=181 around (x,y), using the current color. */
     function void drawCircle(int x, int y, int r) {
+		var int d, h;
+		if (~(r > 181)) {
+			let d = 0;
+			while (~(d > r)) {
+				let h = Math.sqrt((r*r) - (d*d));
+				do Screen.drawLine_horizontal(x-h, x+h, y+d);
+				do Screen.drawLine_horizontal(x-h, x+h, y-d);
+				let d = d + 1;
+			}
+		}
 		return;
     }
 }
