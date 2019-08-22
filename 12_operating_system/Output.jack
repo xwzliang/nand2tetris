@@ -18,9 +18,19 @@ class Output {
 
     // Character map for displaying characters
     static Array charMaps; 
+	// The memory location of the cursor's top-left
+	static int memory_location_cursor;
+	static int cursor_row_num, cursor_col_num;
+	static int SCREEN_BASE;		// Holds the value of base memory address allocated for screen
 
     /** Initializes the screen, and locates the cursor at the screen's top-left. */
     function void init() {
+		let SCREEN_BASE = 16384;
+		do Output.initMap();
+		let cursor_row_num = 0;
+		let cursor_col_num = 0;
+		do Output.moveCursor(cursor_row_num, cursor_col_num);
+		return;
     }
 
     // Initializes the character map array
@@ -71,7 +81,7 @@ class Output {
         do Output.create(64,30,51,51,59,59,59,27,3,30,0,0);  // @
         do Output.create(63,30,51,51,24,12,12,0,12,12,0,0);  // ?
 
-        do Output.create(65,0,0,0,0,0,0,0,0,0,0,0);          // A ** TO BE FILLED **
+        do Output.create(65,12,30,51,51,63,51,51,51,51,0,0);          // A
         do Output.create(66,31,51,51,51,31,51,51,51,31,0,0); // B
         do Output.create(67,28,54,35,3,3,3,35,54,28,0,0);    // C
         do Output.create(68,15,27,51,51,51,51,51,27,15,0,0); // D
@@ -148,6 +158,7 @@ class Output {
 	let map = Array.new(11);
         let charMaps[index] = map;
 
+		// Each value is a binary number whose bits represent the 8 pixels that render the character's image in this row.
         let map[0] = a;
         let map[1] = b;
         let map[2] = c;
@@ -176,28 +187,66 @@ class Output {
     /** Moves the cursor to the j-th column of the i-th row,
      *  and erases the character displayed there. */
     function void moveCursor(int i, int j) {
+		if (j = 64) {	// There are 64 chars each line, so we need move to next line
+			let i = i + 1;
+			let j = 0;
+		} 
+		if (i = 23) {	// There are 23 lines in total, so if line comes to 23, we start from the top-left
+			let i = 0;
+		}
+		let cursor_row_num = i;
+		let cursor_col_num = j;
+		let memory_location_cursor = SCREEN_BASE + (cursor_col_num * 8 / 16) + (cursor_row_num * 352); 	// j * 8 / 16 and i * 11 * 32, each character is 8 columns and 11 rows of pixels
+		return;
     }
 
     /** Displays the given character at the cursor location,
      *  and advances the cursor one column forward. */
     function void printChar(char c) {
+		var Array char_map;
+		var int i;
+		var int col_num_mod_2;
+		var int memory_word_value, memory_location;
+		let char_map = Output.getMap(c);
+		let col_num_mod_2 = cursor_col_num - (cursor_col_num / 2 * 2);
+		let i = 0;
+		if (col_num_mod_2) {	// col_num_mod_2 = 1, so we need to operate on the other half of the memory word
+			while (i < 12) {
+				let memory_location = memory_location_cursor + (i*32);	// Each line of screen from is 32 words of memory
+				let memory_word_value = Memory.peek(memory_location);
+				do Memory.poke(memory_location, char_map[i] * 256 + memory_word_value);		// First shift 8 bits, then add original memory word value
+				let i = i + 1;
+			}
+		} else {
+			while (i < 12) {
+				let memory_location = memory_location_cursor + (i*32);
+				do Memory.poke(memory_location, char_map[i]);
+				let i = i + 1;
+			}
+		}
+		do Output.moveCursor(cursor_row_num, cursor_col_num + 1);
+		return;
     }
 
     /** displays the given string starting at the cursor location,
      *  and advances the cursor appropriately. */
     function void printString(String s) {
+		return;
     }
 
     /** Displays the given integer starting at the cursor location,
      *  and advances the cursor appropriately. */
     function void printInt(int i) {
+		return;
     }
 
     /** Advances the cursor to the beginning of the next line. */
     function void println() {
+		return;
     }
 
     /** Moves the cursor one column back. */
     function void backSpace() {
+		return;
     }
 }
