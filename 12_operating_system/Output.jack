@@ -193,16 +193,30 @@ class Output {
 		} 
 		if (i = 23) {	// There are 23 lines in total, so if line comes to 23, we start from the top-left
 			let i = 0;
+		} else {
+			if (i = -1) {	// When do backspace, if cursor gets to the start of the line, then move to the end of the above line (if not already at the top-left)
+				if (~(j = 0)) {
+					let i = 63;
+					let j = j - 1;
+				}
+			}
 		}
 		let cursor_row_num = i;
 		let cursor_col_num = j;
 		let memory_location_cursor = SCREEN_BASE + (cursor_col_num * 8 / 16) + (cursor_row_num * 352); 	// j * 8 / 16 and i * 11 * 32, each character is 8 columns and 11 rows of pixels
+		do Output.display_char(32);
 		return;
     }
 
     /** Displays the given character at the cursor location,
      *  and advances the cursor one column forward. */
     function void printChar(char c) {
+		do Output.display_char(c);
+		do Output.moveCursor(cursor_row_num, cursor_col_num + 1);
+		return;
+    }
+
+    function void display_char(char c) {
 		var Array char_map;
 		var int i;
 		var int col_num_mod_2;
@@ -214,7 +228,7 @@ class Output {
 			while (i < 12) {
 				let memory_location = memory_location_cursor + (i*32);	// Each line of screen from is 32 words of memory
 				let memory_word_value = Memory.peek(memory_location);
-				do Memory.poke(memory_location, char_map[i] * 256 + memory_word_value);		// First shift 8 bits, then add original memory word value
+				do Memory.poke(memory_location, char_map[i] * 256 + (memory_word_value & 255));		// First shift 8 bits, then add the first 8 bits of the original memory word value (mask 0000000011111111 = 255)
 				let i = i + 1;
 			}
 		} else {
@@ -224,29 +238,43 @@ class Output {
 				let i = i + 1;
 			}
 		}
-		do Output.moveCursor(cursor_row_num, cursor_col_num + 1);
 		return;
     }
 
     /** displays the given string starting at the cursor location,
      *  and advances the cursor appropriately. */
     function void printString(String s) {
+		var int length;
+		var int i;
+		let length = s.length();
+		let i = 0;
+		while (i < length) {
+			do Output.printChar(s.charAt(i));
+			let i = i + 1;
+		}
 		return;
     }
 
     /** Displays the given integer starting at the cursor location,
      *  and advances the cursor appropriately. */
     function void printInt(int i) {
+		var String s;
+		let s = String.new(6);
+		do s.setInt(i);
+		do Output.printString(s);
+		do s.dispose();
 		return;
     }
 
     /** Advances the cursor to the beginning of the next line. */
     function void println() {
+		do Output.moveCursor(cursor_row_num + 1, 0);
 		return;
     }
 
     /** Moves the cursor one column back. */
     function void backSpace() {
+		do Output.moveCursor(cursor_row_num, cursor_col_num - 1);
 		return;
     }
 }
