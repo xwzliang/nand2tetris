@@ -1,0 +1,83 @@
+// This file is part of www.nand2tetris.org
+// and the book "The Elements of Computing Systems"
+// by Nisan and Schocken, MIT Press.
+// File name: projects/12/Memory.jack
+
+/**
+ * This library provides two services: direct access to the computer's main
+ * memory (RAM), and allocation and recycling of memory blocks. The Hack RAM
+ * consists of 32,768 words, each holding a 16-bit binary number.
+ */ 
+class Memory {
+	
+	static Array RAM;	// for Memory access
+	static int HEAP_BASE;	// Holds the base address of the heap i.e. 2048
+
+    /** Initializes the class. */
+    function void init() {
+		let RAM = 0;	// This is a trick to map all memory into the RAM array
+		let HEAP_BASE = 2048;	// 2048 is the base address of the heap specified by Hack and Jack implementation
+		// For Memory.alloc, each segment will have head part and data part, head part will have two units, first one to store available memory length of this segment, second one to store the address of next available segment
+		let RAM[HEAP_BASE] = 14334;	// The length of this chunk: 16384-2048-2. Heap resides at RAM locations 2048-16383, and two units reserved for next available chunk pointer and the length of this chunk
+		let RAM[HEAP_BASE+1] = null;	// Next available chunk pointer is null at init time
+		return;
+    }
+
+    /** Returns the RAM value at the given address. */
+    function int peek(int address) {
+		return RAM[address];
+    }
+
+    /** Sets the RAM value at the given address to the given value. */
+    function void poke(int address, int value) {
+		let RAM[address] = value;
+		return;
+    }
+
+    /** Finds an available RAM block of the given size and returns
+     *  a reference to its base address. */
+    function int alloc(int size) {
+		return Memory.find_avail_and_alloc(HEAP_BASE, size);
+    }
+
+	function int find_avail_and_alloc(int memory_seg_base, int alloc_size) {
+		var int memory_seg_end;
+		var int available_memory_length;
+		var int alloc_address;
+		let available_memory_length = RAM[memory_seg_base];
+		let memory_seg_end = memory_seg_base + available_memory_length + 1;
+		if (available_memory_length > (alloc_size + 1)) {		// at least size+2
+			// Alloc segment
+			let alloc_address = memory_seg_end - alloc_size + 1;
+			let RAM[alloc_address-1] = null;
+			let RAM[alloc_address-2] = alloc_size;
+			// Update segment after allocation
+			let RAM[memory_seg_base] = available_memory_length - alloc_size - 2;	// 2 units will be used as segment head part (available_memory_length and address of next available segment)
+		} else {
+			if (~(RAM[memory_seg_base+1])) {	// RAM[memory_seg_base+1] = null, which means no more available memory segment
+				return false;
+			} else {
+				let alloc_address = Memory.find_avail_and_alloc(RAM[memory_seg_base+1], alloc_size);		// Recursive call
+			}
+		}
+		return alloc_address;
+	}
+
+    /** De-allocates the given object (cast as an array) by making
+     *  it available for future allocations. */
+    function void deAlloc(Array o) {
+		do Memory.find_end_and_deAlloc(HEAP_BASE, o);		// Start with HEAP_BASE
+		return;
+    }    
+
+	function void find_end_and_deAlloc(int memory_seg_base, int deAlloc_address) {
+		var int memory_next_avail_address;
+		let memory_next_avail_address = RAM[memory_seg_base+1];
+		if (memory_next_avail_address) {
+			do Memory.find_end_and_deAlloc(memory_next_avail_address, deAlloc_address);
+		} else {	// memory_next_avail_address = null, which means the end of avalible list
+			let RAM[memory_seg_base+1] = deAlloc_address - 2;	// deAlloc_address - 2 is the base address of this to-be-deAlloced memory segment
+		}
+		return;
+	}
+}
