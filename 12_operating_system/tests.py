@@ -55,5 +55,9 @@ class OperatingSystem(unittest.TestCase):
         jack_class = self.cwd / 'Keyboard.jack'
         self.copy_compile_and_compare(jack_class, False)
 
+    def test_class_Sys(self):
+        jack_class = self.cwd / 'Sys.jack'
+        self.copy_compile_and_compare(jack_class, False)
+
 if __name__ == '__main__':
     unittest.main()
