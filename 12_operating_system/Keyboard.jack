@@ -7,9 +7,12 @@
  * A library for handling user input from the keyboard.
  */
 class Keyboard {
+	static int KEYBOARD_MEMORY_ADDRESS;
 
     /** Initializes the keyboard. */
     function void init() {
+		let KEYBOARD_MEMORY_ADDRESS = 24576;
+		return;
     } 
 
     /**
@@ -33,6 +36,7 @@ class Keyboard {
      * F1 - F12 = 141 - 152
      */
     function char keyPressed() {
+		return Memory.peek(KEYBOARD_MEMORY_ADDRESS);
     }
 
     /**								
@@ -41,6 +45,18 @@ class Keyboard {
      * of the pressed key.
      */
     function char readChar() {
+		var char c;
+		do Output.printChar(0);		// Display the cursor
+		while (~Keyboard.keyPressed()) {
+			// Do nothing, wait till a key is pressed
+		}
+		let c = Keyboard.keyPressed();
+		while (Keyboard.keyPressed()) {
+			// Do nothing, wait for the user to let go
+		}
+		do Output.backSpace();		// Erase the cursor output
+		do Output.printChar(c);		// Display the pressed char
+		return c;
     }
 
     /**								
@@ -49,6 +65,23 @@ class Keyboard {
      * and returns its value. Also handles user backspaces.
      */
     function String readLine(String message) {
+		var String input_string;
+		var char input_char;
+		do Output.printString(message);
+		let input_string = String.new(20);		// Arbitrary max length
+		let input_char = Keyboard.readChar();
+		while (~(input_char = 128)) {	// input_char is not newline (enter)
+			if (input_char = 129) {		// input_char is backspace
+				do input_string.eraseLastChar();
+				let input_char = Keyboard.readChar();
+			} else {
+				let input_string = input_string.appendChar(input_char);
+				let input_char = Keyboard.readChar();
+			}
+		}
+		do Output.printString(input_string);
+		do Output.println();
+		return input_string;
     }   
 
     /**								
@@ -58,5 +91,10 @@ class Keyboard {
      * entered text is detected). Also handles user backspaces. 
      */
     function int readInt(String message) {
+		var int input_int;
+		var String input_string;
+		let input_string = Keyboard.readLine(message);
+		let input_int = input_string.intValue();
+		return input_int;
     }
 }
