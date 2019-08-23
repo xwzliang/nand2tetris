@@ -59,5 +59,14 @@ class OperatingSystem(unittest.TestCase):
         jack_class = self.cwd / 'Sys.jack'
         self.copy_compile_and_compare(jack_class, False)
 
+    def test_final_test_Pong(self):
+        test_dir = self.cwd / 'test/Pong'
+        # Copy all jack class file to test_dir
+        for jack_class in self.cwd.glob('*.jack'):
+            shutil.copy2(jack_class, test_dir)
+        # Run JackCompiler to generate vm file
+        proc_compile = sp.run([self.given_compile_tool.as_posix(), test_dir.as_posix()], stdout=sp.PIPE, universal_newlines=True)
+        self.assertTrue(len(list(test_dir.glob('*.vm'))) == 4 + 8)
+
 if __name__ == '__main__':
     unittest.main()
