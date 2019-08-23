@@ -44,6 +44,7 @@ class Screen {
 		let i = 0;
 		while (i < 8192) {		// Since Hack is 16 bit machine, there are 8192 memory words in total, 512 / 16 * 256
 			do Memory.poke(SCREEN_BASE + i, 0);
+			let i = i + 1;
 		}
 		return;
     }
